@@ -27,6 +27,13 @@ public:
     //==============================================================================
     // MidiInputCallback
     void handleIncomingMidiMessage (juce::MidiInput* source, const juce::MidiMessage& message) override;
+    
+    //==============================================================================
+    // Méthodes pour envoyer des messages MIDI
+    void sendNoteOn (int channel, int noteNumber, float velocity);
+    void sendNoteOff (int channel, int noteNumber, float velocity = 0.0f);
+    void sendProgramChange (int channel, int programNumber);
+    void sendControlChange (int channel, int controllerNumber, int controllerValue);
 
 private:
     //==============================================================================
@@ -36,6 +43,9 @@ private:
     // Entrée MIDI
     std::unique_ptr<juce::MidiInput> midiInput;
     
+    // Sortie MIDI
+    std::unique_ptr<juce::MidiOutput> midiOutput;
+    
     // Tableau des URLs des fichiers vidéo
     juce::Array<juce::URL> videoUrls;
     
@@ -44,6 +54,9 @@ private:
     
     // Méthode pour initialiser l'entrée MIDI
     void initializeMidiInput();
+    
+    // Méthode pour initialiser la sortie MIDI
+    void initializeMidiOutput();
     
     // Méthode pour scanner le dossier BIS et remplir videoUrls
     void scanVideoFiles();

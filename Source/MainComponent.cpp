@@ -13,6 +13,9 @@ MainComponent::MainComponent()
     // Initialiser l'entrée MIDI
     initializeMidiInput();
     
+    // Initialiser la sortie MIDI
+    initializeMidiOutput();
+    
     // Scanner le dossier BIS pour trouver tous les fichiers vidéo
     scanVideoFiles();
     
@@ -27,6 +30,9 @@ MainComponent::~MainComponent()
 {
     // Fermer l'entrée MIDI
     midiInput.reset();
+    
+    // Fermer la sortie MIDI
+    midiOutput.reset();
     
     // This shuts down the audio device and clears the audio source.
     shutdownAudio();
@@ -168,5 +174,71 @@ void MainComponent::initializeMidiInput()
     else
     {
         juce::Logger::writeToLog ("Impossible d'ouvrir le périphérique MIDI : " + midiDevices[0].name);
+    }
+}
+
+void MainComponent::initializeMidiOutput()
+{
+    // Obtenir la liste des périphériques MIDI de sortie disponibles
+    auto midiDevices = juce::MidiOutput::getAvailableDevices();
+    
+    if (midiDevices.isEmpty())
+    {
+        juce::Logger::writeToLog ("Aucun périphérique MIDI de sortie trouvé");
+        return;
+    }
+    
+    // Ouvrir le premier périphérique MIDI de sortie disponible
+    // Vous pouvez modifier cela pour permettre à l'utilisateur de choisir un périphérique spécifique
+    midiOutput = juce::MidiOutput::openDevice (midiDevices[0].identifier);
+    
+    if (midiOutput != nullptr)
+    {
+        juce::Logger::writeToLog ("MIDI Output ouvert : " + midiDevices[0].name);
+    }
+    else
+    {
+        //juce::Logger::writeToLog ("Impossible d'ouvrir le périphérique MIDI de sortie : " + midiDevices[0].name);
+    }
+}
+
+void MainComponent::sendNoteOn (int channel, int noteNumber, float velocity)
+{
+    if (midiOutput != nullptr)
+    {
+        // Les canaux MIDI sont de 1-16, mais MidiMessage utilise 0-15
+        juce::MidiMessage message = juce::MidiMessage::noteOn (channel, noteNumber, velocity);
+        midiOutput->sendMessageNow (message);
+    }
+}
+
+void MainComponent::sendNoteOff (int channel, int noteNumber, float velocity)
+{
+    if (midiOutput != nullptr)
+    {
+        juce::MidiMessage message = juce::MidiMessage::noteOff (channel, noteNumber, velocity);
+        midiOutput->sendMessageNow (message);
+    }
+}
+
+void MainComponent::sendProgramChange (int channel, int programNumber)
+{
+    if (midiOutput != nullptr)
+    {
+        // Les canaux MIDI sont de 1-16, mais MidiMessage utilise 0-15
+        // Les numéros de programme sont de 0-127
+        juce::MidiMessage message = juce::MidiMessage::programChange (channel, programNumber);
+        midiOutput->sendMessageNow (message);
+    }
+}
+
+void MainComponent::sendControlChange (int channel, int controllerNumber, int controllerValue)
+{
+    if (midiOutput != nullptr)
+    {
+        // Les canaux MIDI sont de 1-16, mais MidiMessage utilise 0-15
+        // Les numéros de contrôleur et valeurs sont de 0-127
+        juce::MidiMessage message = juce::MidiMessage::controllerEvent (channel, controllerNumber, controllerValue);
+        midiOutput->sendMessageNow (message);
     }
 }

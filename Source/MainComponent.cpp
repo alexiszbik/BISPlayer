@@ -66,10 +66,8 @@ void MainComponent::releaseResources()
 //==============================================================================
 void MainComponent::paint (juce::Graphics& g)
 {
-    // (Our component is opaque, so we must completely fill the background with a solid colour)
-    g.fillAll (getLookAndFeel().findColour (juce::ResizableWindow::backgroundColourId));
-
-    // Le lecteur vidéo gère son propre rendu, pas besoin de dessiner ici
+    // Fond noir
+    g.fillAll (juce::Colours::black);
 }
 
 void MainComponent::resized()

@@ -10,12 +10,20 @@ MainComponent::MainComponent()
     addAndMakeVisible (videoComponent);
     setAudioChannels (0, 2);
     
-    // Charger automatiquement la vidéo Test.mp4
-    loadVideoFile();
+    // Initialiser l'entrée MIDI
+    initializeMidiInput();
+    
+    // Charger automatiquement la vidéo Test.mp4 depuis ~/Documents/BIS
+    auto docsDir = juce::File::getSpecialLocation (juce::File::userDocumentsDirectory);
+    auto videoFile = docsDir.getChildFile ("BIS").getChildFile ("Test.mp4");
+    loadVideoFile (juce::URL (videoFile));
 }
 
 MainComponent::~MainComponent()
 {
+    // Fermer l'entrée MIDI
+    midiInput.reset();
+    
     // This shuts down the audio device and clears the audio source.
     shutdownAudio();
 }
@@ -70,36 +78,75 @@ void MainComponent::resized()
     videoComponent.setBounds (getLocalBounds());
 }
 
-void MainComponent::loadVideoFile()
+void MainComponent::loadVideoFile (const juce::URL& videoURL)
 {
-    // Chercher le fichier Test.mp4 dans ~/Documents/BIS
-    auto docsDir = juce::File::getSpecialLocation (juce::File::userDocumentsDirectory);
-    auto videoFile = docsDir.getChildFile ("BIS").getChildFile ("Test.mp4");
-    
     // Charger la vidéo de manière asynchrone (fonctionne sur toutes les plateformes)
-    if (videoFile.existsAsFile())
-    {
-        videoComponent.loadAsync (juce::URL (videoFile),
-                                  [this] (const juce::URL&, juce::Result result)
+    videoComponent.loadAsync (videoURL,
+                              [this] (const juce::URL&, juce::Result result)
+                              {
+                                  if (result.wasOk())
                                   {
-            if (result.wasOk())
-            {
-                videoComponent.setAudioVolume (1.0f);
-                videoComponent.play();
-            }
-            else
-            {
-                juce::AlertWindow::showMessageBoxAsync (juce::AlertWindow::WarningIcon,
-                                                        "Erreur",
-                                                        "Impossible de charger la vidéo Test.mp4:\n" + result.getErrorMessage());
-            }
-        });
+                                      videoComponent.setAudioVolume (1.0f);
+                                      videoComponent.play();
+                                  }
+                                  else
+                                  {
+                                      juce::AlertWindow::showMessageBoxAsync (juce::AlertWindow::WarningIcon,
+                                                                              "Erreur",
+                                                                              "Impossible de charger la vidéo:\n" + result.getErrorMessage());
+                                  }
+                              });
+}
+
+void MainComponent::handleIncomingMidiMessage (juce::MidiInput* source, const juce::MidiMessage& message)
+{
+    // Ignorer le paramètre source si non utilisé
+    juce::ignoreUnused (source);
+    
+    // Détecter les messages Note On
+    if (message.isNoteOn())
+    {
+        const int noteNumber = message.getNoteNumber();
+        const int velocity = message.getVelocity();
+        const int channel = message.getChannel();
+        
+        // Ici vous pouvez ajouter votre code pour réagir aux messages Note On
+        // Par exemple : changer de vidéo, contrôler la lecture, etc.
+        
+        /*juce::Logger::writeToLog ("Note On reçue - Note: " + juce::String (noteNumber) +
+                                  ", Vélocité: " + juce::String (velocity) +
+                                  ", Canal: " + juce::String (channel));*/
+        std::cout << noteNumber << std::endl;
+         
+         
+        
+        // Exemple : si vous voulez faire quelque chose avec la vidéo
+        // videoComponent.setPlayPosition (noteNumber / 127.0 * videoComponent.getVideoDuration());
+    }
+}
+
+void MainComponent::initializeMidiInput()
+{
+    // Obtenir la liste des périphériques MIDI disponibles
+    auto midiDevices = juce::MidiInput::getAvailableDevices();
+    
+    if (midiDevices.isEmpty())
+    {
+        juce::Logger::writeToLog ("Aucun périphérique MIDI trouvé");
+        return;
+    }
+    
+    // Ouvrir le premier périphérique MIDI disponible
+    // Vous pouvez modifier cela pour permettre à l'utilisateur de choisir un périphérique spécifique
+    midiInput = juce::MidiInput::openDevice (midiDevices[0].identifier, this);
+    
+    if (midiInput != nullptr)
+    {
+        midiInput->start();
+        juce::Logger::writeToLog ("MIDI Input ouvert : " + midiDevices[0].name);
     }
     else
     {
-        // Fichier introuvable - afficher un message d'erreur
-        juce::AlertWindow::showMessageBoxAsync (juce::AlertWindow::WarningIcon,
-                                                "Fichier introuvable",
-                                                "Le fichier Test.mp4 n'a pas été trouvé dans ~/Documents/BIS/");
+        juce::Logger::writeToLog ("Impossible d'ouvrir le périphérique MIDI : " + midiDevices[0].name);
     }
 }

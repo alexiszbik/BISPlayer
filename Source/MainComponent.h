@@ -36,11 +36,19 @@ private:
     // Entrée MIDI
     std::unique_ptr<juce::MidiInput> midiInput;
     
+    // Tableau des URLs des fichiers vidéo
+    juce::Array<juce::URL> videoUrls;
+    
     // Méthode pour charger une vidéo depuis une URL
     void loadVideoFile (const juce::URL& videoURL);
     
     // Méthode pour initialiser l'entrée MIDI
     void initializeMidiInput();
+    
+    // Méthode pour scanner le dossier BIS et remplir videoUrls
+    void scanVideoFiles();
+    
+    int currentVideoIndex = 0;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MainComponent)
 };

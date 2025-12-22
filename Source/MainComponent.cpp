@@ -13,10 +13,14 @@ MainComponent::MainComponent()
     // Initialiser l'entrée MIDI
     initializeMidiInput();
     
-    // Charger automatiquement la vidéo Test.mp4 depuis ~/Documents/BIS
-    auto docsDir = juce::File::getSpecialLocation (juce::File::userDocumentsDirectory);
-    auto videoFile = docsDir.getChildFile ("BIS").getChildFile ("Test.mp4");
-    loadVideoFile (juce::URL (videoFile));
+    // Scanner le dossier BIS pour trouver tous les fichiers vidéo
+    scanVideoFiles();
+    
+    // Charger automatiquement la première vidéo si disponible
+    if (videoUrls.size() > 0)
+    {
+        loadVideoFile (videoUrls[0]);
+    }
 }
 
 MainComponent::~MainComponent()
@@ -100,28 +104,46 @@ void MainComponent::loadVideoFile (const juce::URL& videoURL)
 
 void MainComponent::handleIncomingMidiMessage (juce::MidiInput* source, const juce::MidiMessage& message)
 {
-    // Ignorer le paramètre source si non utilisé
     juce::ignoreUnused (source);
-    
-    // Détecter les messages Note On
     if (message.isNoteOn())
     {
         const int noteNumber = message.getNoteNumber();
         const int velocity = message.getVelocity();
         const int channel = message.getChannel();
         
-        // Ici vous pouvez ajouter votre code pour réagir aux messages Note On
-        // Par exemple : changer de vidéo, contrôler la lecture, etc.
-        
-        /*juce::Logger::writeToLog ("Note On reçue - Note: " + juce::String (noteNumber) +
-                                  ", Vélocité: " + juce::String (velocity) +
-                                  ", Canal: " + juce::String (channel));*/
         std::cout << noteNumber << std::endl;
          
-         
+        currentVideoIndex++;
+        currentVideoIndex = currentVideoIndex % videoUrls.size();
         
-        // Exemple : si vous voulez faire quelque chose avec la vidéo
-        // videoComponent.setPlayPosition (noteNumber / 127.0 * videoComponent.getVideoDuration());
+        loadVideoFile (videoUrls[currentVideoIndex]);
+    }
+}
+
+void MainComponent::scanVideoFiles()
+{
+    videoUrls.clear();
+    
+    auto docsDir = juce::File::getSpecialLocation (juce::File::userDocumentsDirectory);
+    auto bisDir = docsDir.getChildFile ("BIS");
+    
+    if (! bisDir.isDirectory())
+    {
+        jassert(false && "Le dossier ~/Documents/BIS n'existe pas");
+        return;
+    }
+    
+    juce::Array<juce::File> files;
+    bisDir.findChildFiles (files, juce::File::findFiles, false);
+
+    for (const auto& file : files)
+    {
+        auto extension = file.getFileExtension().toLowerCase();
+        
+        if (extension == ".mov" || extension == ".mp4")
+        {
+            videoUrls.add (juce::URL (file));
+        }
     }
 }
 

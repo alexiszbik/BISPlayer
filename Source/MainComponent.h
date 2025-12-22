@@ -26,7 +26,10 @@ public:
 private:
     //==============================================================================
     // Your private member variables go here...
-
+    juce::VideoComponent videoComponent;
+    
+    // Méthode pour charger automatiquement la vidéo
+    void loadVideoFile();
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MainComponent)
 };

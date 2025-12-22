@@ -7,22 +7,8 @@ MainComponent::MainComponent()
     // Make sure you set the size of the component after
     // you add any child components.
     setSize (800, 600);
-
-    // Ajouter le composant vidéo comme enfant
     addAndMakeVisible (videoComponent);
-
-    // Some platforms require permissions to open input channels so request that here
-    if (juce::RuntimePermissions::isRequired (juce::RuntimePermissions::recordAudio)
-        && ! juce::RuntimePermissions::isGranted (juce::RuntimePermissions::recordAudio))
-    {
-        juce::RuntimePermissions::request (juce::RuntimePermissions::recordAudio,
-                                           [&] (bool granted) { setAudioChannels (granted ? 2 : 0, 2); });
-    }
-    else
-    {
-        // Specify the number of input and output channels that we want to open
-        setAudioChannels (2, 2);
-    }
+    setAudioChannels (0, 2);
     
     // Charger automatiquement la vidéo Test.mp4
     loadVideoFile();
@@ -96,18 +82,18 @@ void MainComponent::loadVideoFile()
         videoComponent.loadAsync (juce::URL (videoFile),
                                   [this] (const juce::URL&, juce::Result result)
                                   {
-                                      if (result.wasOk())
-                                      {
-                                          // Démarrer la lecture automatiquement
-                                          videoComponent.play();
-                                      }
-                                      else
-                                      {
-                                          juce::AlertWindow::showMessageBoxAsync (juce::AlertWindow::WarningIcon,
-                                                                                  "Erreur",
-                                                                                  "Impossible de charger la vidéo Test.mp4:\n" + result.getErrorMessage());
-                                      }
-                                  });
+            if (result.wasOk())
+            {
+                videoComponent.setAudioVolume (1.0f);
+                videoComponent.play();
+            }
+            else
+            {
+                juce::AlertWindow::showMessageBoxAsync (juce::AlertWindow::WarningIcon,
+                                                        "Erreur",
+                                                        "Impossible de charger la vidéo Test.mp4:\n" + result.getErrorMessage());
+            }
+        });
     }
     else
     {

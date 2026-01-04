@@ -1,5 +1,14 @@
 #include "MainComponent.h"
 
+#include <random>
+
+int randomBetween(int x, int y) {
+    static std::mt19937 rng{std::random_device{}()};
+    if (x > y) std::swap(x, y);
+    std::uniform_int_distribution<int> dist(x, y);
+    return dist(rng);
+}
+
 //==============================================================================
 MainComponent::MainComponent()
     : videoComponent (false)  // false = pas de contrôles natifs, on gère nous-mêmes
@@ -27,6 +36,30 @@ MainComponent::MainComponent()
     componentLogger = std::make_unique<ComponentLogger> (&logTextEditor);
     juce::Logger::setCurrentLogger (componentLogger.get());
     
+    // Configurer le callback pour détecter la fin de la vidéo
+    // Utiliser MessageManager::callAsync pour s'assurer que l'appel est thread-safe
+    videoComponent.onPlaybackStopped = [this]()
+    {
+        juce::MessageManager::callAsync ([this]()
+        {
+            // Vérifier si la vidéo est arrivée à la fin
+            if (videoComponent.isVideoOpen())
+            {
+                auto duration = videoComponent.getVideoDuration();
+                auto position = videoComponent.getPlayPosition();
+                
+                // Si on est proche de la fin (à moins de 0.1 seconde), passer à la suivante
+                if (duration > 0 && position >= duration - 0.1)
+                {
+                    playNextVideo();
+                }
+            }
+        });
+    };
+    
+    // Démarrer le timer pour vérifier périodiquement la fin de la vidéo
+    startTimer (100);  // Vérifier toutes les 100ms
+    
     setAudioChannels (0, 2);
     
     // Initialiser l'entrée MIDI
@@ -47,6 +80,13 @@ MainComponent::MainComponent()
 
 MainComponent::~MainComponent()
 {
+    // Arrêter le timer
+    stopTimer();
+    
+    // Nettoyer les callbacks du VideoComponent pour éviter les appels après destruction
+    videoComponent.onPlaybackStopped = nullptr;
+    videoComponent.onPlaybackStarted = nullptr;
+    
     // Désenregistrer le logger avant de le détruire
     juce::Logger::setCurrentLogger (nullptr);
     
@@ -156,23 +196,72 @@ void MainComponent::loadVideoFile (const juce::URL& videoURL)
                                       juce::Logger::writeToLog ("Failed to load video: " + result.getErrorMessage());
                                   }
                               });
+    
+    
+    sendProgramChange(15, randomBetween(71, 73));
 }
 
 void MainComponent::handleIncomingMidiMessage (juce::MidiInput* source, const juce::MidiMessage& message)
 {
-    juce::ignoreUnused (source);
+    juce::String sourceName = "Unknown";
+    if (source != nullptr)
+    {
+        auto deviceInfo = source->getDeviceInfo();
+        sourceName = deviceInfo.name.isNotEmpty() ? deviceInfo.name : "Unknown";
+    }
+    juce::String logMessage;
+    
+    // Logger tous les types de messages MIDI entrants
     if (message.isNoteOn())
     {
         const int noteNumber = message.getNoteNumber();
         const int velocity = message.getVelocity();
         const int channel = message.getChannel();
         
-        std::cout << noteNumber << std::endl;
-         
+        logMessage = "MIDI IN [" + sourceName + "] Note On - Channel: " + juce::String (channel) + 
+                     ", Note: " + juce::String (noteNumber) + 
+                     ", Velocity: " + juce::String (velocity);
+        
+        juce::Logger::writeToLog (logMessage);
+        
         currentVideoIndex++;
         currentVideoIndex = currentVideoIndex % videoUrls.size();
         
         loadVideoFile (videoUrls[currentVideoIndex]);
+    }
+    else if (message.isNoteOff())
+    {
+        const int noteNumber = message.getNoteNumber();
+        const int velocity = message.getVelocity();
+        const int channel = message.getChannel();
+        
+        logMessage = "MIDI IN [" + sourceName + "] Note Off - Channel: " + juce::String (channel) + 
+                     ", Note: " + juce::String (noteNumber) + 
+                     ", Velocity: " + juce::String (velocity);
+        
+        juce::Logger::writeToLog (logMessage);
+    }
+    else if (message.isProgramChange())
+    {
+        const int programNumber = message.getProgramChangeNumber();
+        const int channel = message.getChannel();
+        
+        logMessage = "MIDI IN [" + sourceName + "] Program Change - Channel: " + juce::String (channel) + 
+                     ", Program: " + juce::String (programNumber);
+        
+        juce::Logger::writeToLog (logMessage);
+    }
+    else if (message.isController())
+    {
+        const int controllerNumber = message.getControllerNumber();
+        const int controllerValue = message.getControllerValue();
+        const int channel = message.getChannel();
+        
+        logMessage = "MIDI IN [" + sourceName + "] Control Change - Channel: " + juce::String (channel) + 
+                     ", CC: " + juce::String (controllerNumber) + 
+                     ", Value: " + juce::String (controllerValue);
+        
+        juce::Logger::writeToLog (logMessage);
     }
 }
 
@@ -261,6 +350,10 @@ void MainComponent::sendNoteOn (int channel, int noteNumber, float velocity)
         // Les canaux MIDI sont de 1-16, mais MidiMessage utilise 0-15
         juce::MidiMessage message = juce::MidiMessage::noteOn (channel, noteNumber, velocity);
         midiOutput->sendMessageNow (message);
+        
+        juce::Logger::writeToLog ("MIDI OUT Note On - Channel: " + juce::String (channel) + 
+                                   ", Note: " + juce::String (noteNumber) + 
+                                   ", Velocity: " + juce::String ((int)(velocity * 127)));
     }
 }
 
@@ -270,6 +363,10 @@ void MainComponent::sendNoteOff (int channel, int noteNumber, float velocity)
     {
         juce::MidiMessage message = juce::MidiMessage::noteOff (channel, noteNumber, velocity);
         midiOutput->sendMessageNow (message);
+        
+        juce::Logger::writeToLog ("MIDI OUT Note Off - Channel: " + juce::String (channel) + 
+                                   ", Note: " + juce::String (noteNumber) + 
+                                   ", Velocity: " + juce::String ((int)(velocity * 127)));
     }
 }
 
@@ -281,6 +378,9 @@ void MainComponent::sendProgramChange (int channel, int programNumber)
         // Les numéros de programme sont de 0-127
         juce::MidiMessage message = juce::MidiMessage::programChange (channel, programNumber);
         midiOutput->sendMessageNow (message);
+        
+        juce::Logger::writeToLog ("MIDI OUT Program Change - Channel: " + juce::String (channel) + 
+                                   ", Program: " + juce::String (programNumber));
     }
 }
 
@@ -292,5 +392,39 @@ void MainComponent::sendControlChange (int channel, int controllerNumber, int co
         // Les numéros de contrôleur et valeurs sont de 0-127
         juce::MidiMessage message = juce::MidiMessage::controllerEvent (channel, controllerNumber, controllerValue);
         midiOutput->sendMessageNow (message);
+        
+        juce::Logger::writeToLog ("MIDI OUT Control Change - Channel: " + juce::String (channel) + 
+                                   ", CC: " + juce::String (controllerNumber) + 
+                                   ", Value: " + juce::String (controllerValue));
     }
+}
+
+void MainComponent::timerCallback()
+{
+    // Vérifier périodiquement si la vidéo est arrivée à la fin
+    if (videoComponent.isVideoOpen() && videoComponent.isPlaying())
+    {
+        auto duration = videoComponent.getVideoDuration();
+        auto position = videoComponent.getPlayPosition();
+        
+        // Si on est arrivé à la fin (ou très proche), passer à la vidéo suivante
+        if (duration > 0 && position >= duration - 0.05)
+        {
+            playNextVideo();
+        }
+    }
+}
+
+void MainComponent::playNextVideo()
+{
+    if (videoUrls.size() == 0)
+        return;
+    
+    // Passer à la vidéo suivante
+    currentVideoIndex++;
+    currentVideoIndex = currentVideoIndex % videoUrls.size();
+    
+    // Charger la vidéo suivante
+    loadVideoFile (videoUrls[currentVideoIndex]);
+    
 }

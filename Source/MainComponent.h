@@ -9,7 +9,8 @@
     your controls and content.
 */
 class MainComponent  : public juce::AudioAppComponent,
-                        public juce::MidiInputCallback
+                        public juce::MidiInputCallback,
+                        public juce::Timer
 {
 public:
     //==============================================================================
@@ -74,6 +75,12 @@ private:
     
     // Méthode pour scanner le dossier BIS et remplir videoUrls
     void scanVideoFiles();
+    
+    // Timer pour vérifier la fin de la vidéo
+    void timerCallback() override;
+    
+    // Méthode pour passer à la vidéo suivante
+    void playNextVideo();
     
     int currentVideoIndex = 0;
 

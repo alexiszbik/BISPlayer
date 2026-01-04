@@ -6,8 +6,27 @@ MainComponent::MainComponent()
 {
     // Make sure you set the size of the component after
     // you add any child components.
-    setSize (800, 600);
+    setSize (1200, 600);
+    
+    // Configurer le TextEditor pour les logs
+    logTextEditor.setMultiLine (true);
+    logTextEditor.setReturnKeyStartsNewLine (true);
+    logTextEditor.setReadOnly (true);
+    logTextEditor.setCaretVisible (false);
+    logTextEditor.setFont (juce::Font (juce::Font::getDefaultMonospacedFontName(), 12.0f, juce::Font::plain));
+    logTextEditor.setColour (juce::TextEditor::backgroundColourId, juce::Colours::black);
+    logTextEditor.setColour (juce::TextEditor::textColourId, juce::Colours::lightgreen);
+    
     addAndMakeVisible (videoComponent);
+    addAndMakeVisible (logTextEditor);
+    
+    // Activer le focus clavier pour recevoir les événements de touches
+    setWantsKeyboardFocus (true);
+    
+    // Créer le logger personnalisé
+    componentLogger = std::make_unique<ComponentLogger> (&logTextEditor);
+    juce::Logger::setCurrentLogger (componentLogger.get());
+    
     setAudioChannels (0, 2);
     
     // Initialiser l'entrée MIDI
@@ -28,11 +47,17 @@ MainComponent::MainComponent()
 
 MainComponent::~MainComponent()
 {
+    // Désenregistrer le logger avant de le détruire
+    juce::Logger::setCurrentLogger (nullptr);
+    
     // Fermer l'entrée MIDI
     midiInput.reset();
     
     // Fermer la sortie MIDI
     midiOutput.reset();
+    
+    // Fermer le logger
+    componentLogger.reset();
     
     // This shuts down the audio device and clears the audio source.
     shutdownAudio();
@@ -82,8 +107,37 @@ void MainComponent::resized()
     // If you add any child components, this is where you should
     // update their positions.
     
-    // Le lecteur vidéo prend toute la taille du composant
-    videoComponent.setBounds (getLocalBounds());
+    auto bounds = getLocalBounds();
+    
+    if (isLoggerVisible)
+    {
+        // Diviser l'espace : vidéo à gauche, log à droite
+        auto videoBounds = bounds.removeFromLeft (bounds.getWidth() * 2 / 3);
+        videoComponent.setBounds (videoBounds);
+        
+        // Le TextEditor prend le reste de l'espace à droite
+        logTextEditor.setBounds (bounds);
+    }
+    else
+    {
+        // Le lecteur vidéo prend toute la taille du composant
+        videoComponent.setBounds (bounds);
+        logTextEditor.setBounds (0, 0, 0, 0);  // Caché
+    }
+}
+
+bool MainComponent::keyPressed (const juce::KeyPress& key)
+{
+    // Toggle la visibilité du logger avec la touche K (insensible à la casse)
+    if (key.getTextCharacter() == 'k' || key.getTextCharacter() == 'K')
+    {
+        isLoggerVisible = !isLoggerVisible;
+        logTextEditor.setVisible (isLoggerVisible);
+        resized();  // Recalculer le layout
+        return true;  // Consommer l'événement
+    }
+    
+    return false;  // Laisser passer les autres touches
 }
 
 void MainComponent::loadVideoFile (const juce::URL& videoURL)
@@ -99,9 +153,7 @@ void MainComponent::loadVideoFile (const juce::URL& videoURL)
                                   }
                                   else
                                   {
-                                      juce::AlertWindow::showMessageBoxAsync (juce::AlertWindow::WarningIcon,
-                                                                              "Erreur",
-                                                                              "Impossible de charger la vidéo:\n" + result.getErrorMessage());
+                                      juce::Logger::writeToLog ("Failed to load video: " + result.getErrorMessage());
                                   }
                               });
 }
@@ -133,7 +185,7 @@ void MainComponent::scanVideoFiles()
     
     if (! bisDir.isDirectory())
     {
-        jassert(false && "Le dossier ~/Documents/BIS n'existe pas");
+        juce::Logger::writeToLog ("Directory ~/Documents/BIS does not exist");
         return;
     }
     
@@ -158,7 +210,7 @@ void MainComponent::initializeMidiInput()
     
     if (midiDevices.isEmpty())
     {
-        juce::Logger::writeToLog ("Aucun périphérique MIDI trouvé");
+        juce::Logger::writeToLog ("No MIDI input");
         return;
     }
     
@@ -169,11 +221,11 @@ void MainComponent::initializeMidiInput()
     if (midiInput != nullptr)
     {
         midiInput->start();
-        juce::Logger::writeToLog ("MIDI Input ouvert : " + midiDevices[0].name);
+        juce::Logger::writeToLog ("MIDI Input opened: " + midiDevices[0].name);
     }
     else
     {
-        juce::Logger::writeToLog ("Impossible d'ouvrir le périphérique MIDI : " + midiDevices[0].name);
+        juce::Logger::writeToLog ("Failed to open MIDI device: " + midiDevices[0].name);
     }
 }
 
@@ -184,7 +236,7 @@ void MainComponent::initializeMidiOutput()
     
     if (midiDevices.isEmpty())
     {
-        juce::Logger::writeToLog ("Aucun périphérique MIDI de sortie trouvé");
+        juce::Logger::writeToLog ("No MIDI output device found");
         return;
     }
     
@@ -194,11 +246,11 @@ void MainComponent::initializeMidiOutput()
     
     if (midiOutput != nullptr)
     {
-        juce::Logger::writeToLog ("MIDI Output ouvert : " + midiDevices[0].name);
+        juce::Logger::writeToLog ("MIDI Output opened: " + midiDevices[0].name);
     }
     else
     {
-        //juce::Logger::writeToLog ("Impossible d'ouvrir le périphérique MIDI de sortie : " + midiDevices[0].name);
+        juce::Logger::writeToLog ("Failed to open MIDI output device: " + midiDevices[0].name);
     }
 }
 

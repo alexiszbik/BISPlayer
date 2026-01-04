@@ -8,6 +8,8 @@
       <FILE id="q53MQG" name="MainComponent.h" compile="0" resource="0" file="Source/MainComponent.h"/>
       <FILE id="KmpsJV" name="MainComponent.cpp" compile="1" resource="0"
             file="Source/MainComponent.cpp"/>
+      <FILE id="ComponentLoggerH" name="ComponentLogger.h" compile="0" resource="0"
+            file="Source/ComponentLogger.h"/>
     </GROUP>
   </MAINGROUP>
   <MODULES>

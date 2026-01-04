@@ -48,6 +48,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		0529743DB521B191505BCDB1 /* ComponentLogger.h */ /* ComponentLogger.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = ComponentLogger.h; path = ../../Source/ComponentLogger.h; sourceTree = SOURCE_ROOT; };
 		08CFEB183C6030CB5BCF881C /* include_juce_data_structures.mm */ /* include_juce_data_structures.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; name = include_juce_data_structures.mm; path = ../../JuceLibraryCode/include_juce_data_structures.mm; sourceTree = SOURCE_ROOT; };
 		0C06D1B5364C3B92FFCB0F78 /* juce_audio_basics */ /* juce_audio_basics */ = {isa = PBXFileReference; lastKnownFileType = folder; name = juce_audio_basics; path = ../../JUCE/modules/juce_audio_basics; sourceTree = SOURCE_ROOT; };
 		0EDCFC3746ADC0A6FCAB501C /* juce_gui_extra */ /* juce_gui_extra */ = {isa = PBXFileReference; lastKnownFileType = folder; name = juce_gui_extra; path = ../../JUCE/modules/juce_gui_extra; sourceTree = SOURCE_ROOT; };
@@ -137,6 +138,7 @@
 				876D96515625DC21AE98BA34,
 				BD4D1D58D64A8416BB1E4F1B,
 				5F2966857B94A3133323812A,
+				0529743DB521B191505BCDB1,
 			);
 			name = Source;
 			sourceTree = "<group>";

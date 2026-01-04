@@ -1,6 +1,7 @@
 #pragma once
 
 #include <JuceHeader.h>
+#include "ComponentLogger.h"
 
 //==============================================================================
 /*
@@ -25,6 +26,10 @@ public:
     void resized() override;
     
     //==============================================================================
+    // Keyboard handling
+    bool keyPressed (const juce::KeyPress& key) override;
+    
+    //==============================================================================
     // MidiInputCallback
     void handleIncomingMidiMessage (juce::MidiInput* source, const juce::MidiMessage& message) override;
     
@@ -40,6 +45,12 @@ private:
     // Your private member variables go here...
     juce::VideoComponent videoComponent;
     
+    // TextEditor pour afficher les logs
+    juce::TextEditor logTextEditor;
+    
+    // Logger personnalisé
+    std::unique_ptr<ComponentLogger> componentLogger;
+    
     // Entrée MIDI
     std::unique_ptr<juce::MidiInput> midiInput;
     
@@ -48,6 +59,9 @@ private:
     
     // Tableau des URLs des fichiers vidéo
     juce::Array<juce::URL> videoUrls;
+    
+    // État de visibilité du logger
+    bool isLoggerVisible = true;
     
     // Méthode pour charger une vidéo depuis une URL
     void loadVideoFile (const juce::URL& videoURL);

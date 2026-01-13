@@ -26,8 +26,25 @@ MainComponent::MainComponent()
     logTextEditor.setColour (juce::TextEditor::backgroundColourId, juce::Colours::black);
     logTextEditor.setColour (juce::TextEditor::textColourId, juce::Colours::lightgreen);
     
+    // Configurer les labels pour les ComboBox
+    midiInputLabel.setText ("MIDI Input:", juce::dontSendNotification);
+    midiInputLabel.attachToComponent (&midiInputComboBox, true);
+    midiInputLabel.setColour (juce::Label::textColourId, juce::Colours::white);
+    
+    midiOutputLabel.setText ("MIDI Output:", juce::dontSendNotification);
+    midiOutputLabel.attachToComponent (&midiOutputComboBox, true);
+    midiOutputLabel.setColour (juce::Label::textColourId, juce::Colours::white);
+    
+    // Configurer les ComboBox
+    midiInputComboBox.addListener (this);
+    midiOutputComboBox.addListener (this);
+    
     addAndMakeVisible (videoComponent);
     addAndMakeVisible (logTextEditor);
+    addAndMakeVisible (midiInputComboBox);
+    addAndMakeVisible (midiOutputComboBox);
+    addAndMakeVisible (midiInputLabel);
+    addAndMakeVisible (midiOutputLabel);
     
     // Activer le focus clavier pour recevoir les événements de touches
     setWantsKeyboardFocus (true);
@@ -38,7 +55,7 @@ MainComponent::MainComponent()
     
     // Configurer le callback pour détecter la fin de la vidéo
     // Utiliser MessageManager::callAsync pour s'assurer que l'appel est thread-safe
-    videoComponent.onPlaybackStopped = [this]()
+    /*videoComponent.onPlaybackStopped = [this]()
     {
         juce::MessageManager::callAsync ([this]()
         {
@@ -51,16 +68,24 @@ MainComponent::MainComponent()
                 // Si on est proche de la fin (à moins de 0.1 seconde), passer à la suivante
                 if (duration > 0 && position >= duration - 0.1)
                 {
-                    playNextVideo();
+                    juce::MessageManager::callAsync ([this]()
+                    {
+                        playNextVideo();
+                    }
                 }
             }
         });
-    };
+    };*/
+    
+    scanPrograms();
     
     // Démarrer le timer pour vérifier périodiquement la fin de la vidéo
-    startTimer (100);  // Vérifier toutes les 100ms
+    startTimer (50);  // Vérifier toutes les 1000ms
     
     setAudioChannels (0, 2);
+    
+    // Mettre à jour les listes de périphériques MIDI
+    updateMidiDeviceLists();
     
     // Initialiser l'entrée MIDI
     initializeMidiInput();
@@ -68,13 +93,13 @@ MainComponent::MainComponent()
     // Initialiser la sortie MIDI
     initializeMidiOutput();
     
-    // Scanner le dossier BIS pour trouver tous les fichiers vidéo
-    scanVideoFiles();
-    
     // Charger automatiquement la première vidéo si disponible
-    if (videoUrls.size() > 0)
+    if (programs.size() > 0)
     {
-        loadVideoFile (videoUrls[0]);
+        loadProgram(&programs[0]);
+        //loadVideoFile (videoUrls[0]);
+    } else {
+        abort();
     }
 }
 
@@ -84,8 +109,8 @@ MainComponent::~MainComponent()
     stopTimer();
     
     // Nettoyer les callbacks du VideoComponent pour éviter les appels après destruction
-    videoComponent.onPlaybackStopped = nullptr;
-    videoComponent.onPlaybackStarted = nullptr;
+    /*videoComponent.onPlaybackStopped = nullptr;
+    videoComponent.onPlaybackStarted = nullptr;*/
     
     // Désenregistrer le logger avant de le détruire
     juce::Logger::setCurrentLogger (nullptr);
@@ -101,6 +126,11 @@ MainComponent::~MainComponent()
     
     // This shuts down the audio device and clears the audio source.
     shutdownAudio();
+}
+
+void MainComponent::loadProgram(Program* pgm) {
+    auto videoUrl = pgm->getVideoUrl();
+    loadVideoFile(videoUrl);
 }
 
 //==============================================================================
@@ -155,14 +185,38 @@ void MainComponent::resized()
         auto videoBounds = bounds.removeFromLeft (bounds.getWidth() * 2 / 3);
         videoComponent.setBounds (videoBounds);
         
-        // Le TextEditor prend le reste de l'espace à droite
-        logTextEditor.setBounds (bounds);
+        // Zone pour les ComboBox et le logger à droite
+        auto rightArea = bounds;
+        
+        // Réserver de l'espace pour les ComboBox en haut
+        const int comboBoxHeight = 30;
+        const int labelWidth = 100;
+        const int spacing = 5;
+        
+        auto comboBoxArea = rightArea.removeFromTop (comboBoxHeight * 2 + spacing);
+        
+        // Positionner les ComboBox
+        auto inputArea = comboBoxArea.removeFromTop (comboBoxHeight);
+        midiInputLabel.setBounds (inputArea.removeFromLeft (labelWidth));
+        midiInputComboBox.setBounds (inputArea);
+        
+        comboBoxArea.removeFromTop (spacing);
+        auto outputArea = comboBoxArea.removeFromTop (comboBoxHeight);
+        midiOutputLabel.setBounds (outputArea.removeFromLeft (labelWidth));
+        midiOutputComboBox.setBounds (outputArea);
+        
+        // Le TextEditor prend le reste de l'espace en bas
+        logTextEditor.setBounds (rightArea);
     }
     else
     {
         // Le lecteur vidéo prend toute la taille du composant
         videoComponent.setBounds (bounds);
         logTextEditor.setBounds (0, 0, 0, 0);  // Caché
+        midiInputComboBox.setBounds (0, 0, 0, 0);  // Caché
+        midiOutputComboBox.setBounds (0, 0, 0, 0);  // Caché
+        midiInputLabel.setBounds (0, 0, 0, 0);  // Caché
+        midiOutputLabel.setBounds (0, 0, 0, 0);  // Caché
     }
 }
 
@@ -173,6 +227,10 @@ bool MainComponent::keyPressed (const juce::KeyPress& key)
     {
         isLoggerVisible = !isLoggerVisible;
         logTextEditor.setVisible (isLoggerVisible);
+        midiInputComboBox.setVisible (isLoggerVisible);
+        midiOutputComboBox.setVisible (isLoggerVisible);
+        midiInputLabel.setVisible (isLoggerVisible);
+        midiOutputLabel.setVisible (isLoggerVisible);
         resized();  // Recalculer le layout
         return true;  // Consommer l'événement
     }
@@ -182,23 +240,29 @@ bool MainComponent::keyPressed (const juce::KeyPress& key)
 
 void MainComponent::loadVideoFile (const juce::URL& videoURL)
 {
+    std::cout << (const char*)videoURL.toString(false).toUTF8() << std::endl;
     // Charger la vidéo de manière asynchrone (fonctionne sur toutes les plateformes)
     videoComponent.loadAsync (videoURL,
                               [this] (const juce::URL&, juce::Result result)
                               {
-                                  if (result.wasOk())
-                                  {
-                                      videoComponent.setAudioVolume (1.0f);
-                                      videoComponent.play();
-                                  }
-                                  else
-                                  {
-                                      juce::Logger::writeToLog ("Failed to load video: " + result.getErrorMessage());
-                                  }
-                              });
-    
-    
-    sendProgramChange(15, randomBetween(71, 73));
+        if (result.wasOk())
+        {
+            videoComponent.setAudioVolume (1.0f);
+            videoComponent.play();
+        }
+        else
+        {
+            juce::Logger::writeToLog ("Failed to load video: " + result.getErrorMessage());
+        }
+    });
+    /*
+     static int pgm = 70;
+     pgm++;
+     if (pgm > 72) {
+     pgm = 70;
+     }
+     sendProgramChange(16,pgm);
+     sendNoteOn(16,60, 1.f);*/
 }
 
 void MainComponent::handleIncomingMidiMessage (juce::MidiInput* source, const juce::MidiMessage& message)
@@ -223,11 +287,11 @@ void MainComponent::handleIncomingMidiMessage (juce::MidiInput* source, const ju
                      ", Velocity: " + juce::String (velocity);
         
         juce::Logger::writeToLog (logMessage);
-        
+        /*
         currentVideoIndex++;
         currentVideoIndex = currentVideoIndex % videoUrls.size();
         
-        loadVideoFile (videoUrls[currentVideoIndex]);
+        loadVideoFile (videoUrls[currentVideoIndex]);*/
     }
     else if (message.isNoteOff())
     {
@@ -265,29 +329,130 @@ void MainComponent::handleIncomingMidiMessage (juce::MidiInput* source, const ju
     }
 }
 
-void MainComponent::scanVideoFiles()
+void MainComponent::scanPrograms()
 {
-    videoUrls.clear();
+    programs.clear();
     
     auto docsDir = juce::File::getSpecialLocation (juce::File::userDocumentsDirectory);
     auto bisDir = docsDir.getChildFile ("BIS");
     
-    if (! bisDir.isDirectory())
+    if (!bisDir.isDirectory())
     {
         juce::Logger::writeToLog ("Directory ~/Documents/BIS does not exist");
         return;
     }
     
-    juce::Array<juce::File> files;
-    bisDir.findChildFiles (files, juce::File::findFiles, false);
+    juce::Array<juce::File> pgmDirs;
+    bisDir.findChildFiles (pgmDirs, juce::File::findDirectories, false);
 
-    for (const auto& file : files)
+    for (const auto& dir : pgmDirs)
     {
+        /*
         auto extension = file.getFileExtension().toLowerCase();
         
         if (extension == ".mov" || extension == ".mp4")
         {
             videoUrls.add (juce::URL (file));
+        }*/
+        programs.push_back(Program(dir));
+    }
+}
+
+void MainComponent::updateMidiDeviceLists()
+{
+    // Mettre à jour la liste des périphériques MIDI Input
+    midiInputComboBox.clear();
+    midiInputComboBox.addItem ("None", 1);
+    
+    auto inputDevices = juce::MidiInput::getAvailableDevices();
+    for (int i = 0; i < inputDevices.size(); ++i)
+    {
+        midiInputComboBox.addItem (inputDevices[i].name, i + 2);
+    }
+    
+    // Mettre à jour la liste des périphériques MIDI Output
+    midiOutputComboBox.clear();
+    midiOutputComboBox.addItem ("None", 1);
+    
+    auto outputDevices = juce::MidiOutput::getAvailableDevices();
+    for (int i = 0; i < outputDevices.size(); ++i)
+    {
+        midiOutputComboBox.addItem (outputDevices[i].name, i + 2);
+    }
+    
+    // Sélectionner le premier périphérique par défaut (ou "None" si aucun)
+    if (inputDevices.size() > 0)
+        midiInputComboBox.setSelectedId (2);
+    else
+        midiInputComboBox.setSelectedId (1);
+    
+    if (outputDevices.size() > 0)
+        midiOutputComboBox.setSelectedId (2);
+    else
+        midiOutputComboBox.setSelectedId (1);
+}
+
+void MainComponent::comboBoxChanged (juce::ComboBox* comboBoxThatHasChanged)
+{
+    if (comboBoxThatHasChanged == &midiInputComboBox)
+    {
+        // Fermer l'ancien périphérique
+        if (midiInput != nullptr)
+        {
+            midiInput->stop();
+            midiInput.reset();
+        }
+        
+        // Ouvrir le nouveau périphérique si sélectionné
+        int selectedId = midiInputComboBox.getSelectedId();
+        if (selectedId > 1)  // Pas "None"
+        {
+            auto devices = juce::MidiInput::getAvailableDevices();
+            int deviceIndex = selectedId - 2;
+            
+            if (deviceIndex >= 0 && deviceIndex < devices.size())
+            {
+                midiInput = juce::MidiInput::openDevice (devices[deviceIndex].identifier, this);
+                if (midiInput != nullptr)
+                {
+                    midiInput->start();
+                    juce::Logger::writeToLog ("MIDI Input opened: " + devices[deviceIndex].name);
+                }
+            }
+        }
+        else
+        {
+            juce::Logger::writeToLog ("MIDI Input closed");
+        }
+    }
+    else if (comboBoxThatHasChanged == &midiOutputComboBox)
+    {
+        // Fermer l'ancien périphérique
+        midiOutput.reset();
+        
+        // Ouvrir le nouveau périphérique si sélectionné
+        int selectedId = midiOutputComboBox.getSelectedId();
+        if (selectedId > 1)  // Pas "None"
+        {
+            auto devices = juce::MidiOutput::getAvailableDevices();
+            int deviceIndex = selectedId - 2;
+            
+            if (deviceIndex >= 0 && deviceIndex < devices.size())
+            {
+                midiOutput = juce::MidiOutput::openDevice (devices[deviceIndex].identifier);
+                if (midiOutput != nullptr)
+                {
+                    juce::Logger::writeToLog ("MIDI Output opened: " + devices[deviceIndex].name);
+                }
+                else
+                {
+                    juce::Logger::writeToLog ("Failed to open MIDI output device: " + devices[deviceIndex].name);
+                }
+            }
+        }
+        else
+        {
+            juce::Logger::writeToLog ("MIDI Output closed");
         }
     }
 }
@@ -303,18 +468,23 @@ void MainComponent::initializeMidiInput()
         return;
     }
     
-    // Ouvrir le premier périphérique MIDI disponible
-    // Vous pouvez modifier cela pour permettre à l'utilisateur de choisir un périphérique spécifique
-    midiInput = juce::MidiInput::openDevice (midiDevices[0].identifier, this);
+    // Ouvrir le périphérique sélectionné dans la ComboBox (ou le premier par défaut)
+    int selectedId = midiInputComboBox.getSelectedId();
+    int deviceIndex = (selectedId > 1) ? (selectedId - 2) : 0;
     
-    if (midiInput != nullptr)
+    if (deviceIndex >= 0 && deviceIndex < midiDevices.size())
     {
-        midiInput->start();
-        juce::Logger::writeToLog ("MIDI Input opened: " + midiDevices[0].name);
-    }
-    else
-    {
-        juce::Logger::writeToLog ("Failed to open MIDI device: " + midiDevices[0].name);
+        midiInput = juce::MidiInput::openDevice (midiDevices[deviceIndex].identifier, this);
+        
+        if (midiInput != nullptr)
+        {
+            midiInput->start();
+            juce::Logger::writeToLog ("MIDI Input opened: " + midiDevices[deviceIndex].name);
+        }
+        else
+        {
+            juce::Logger::writeToLog ("Failed to open MIDI device: " + midiDevices[deviceIndex].name);
+        }
     }
 }
 
@@ -329,17 +499,22 @@ void MainComponent::initializeMidiOutput()
         return;
     }
     
-    // Ouvrir le premier périphérique MIDI de sortie disponible
-    // Vous pouvez modifier cela pour permettre à l'utilisateur de choisir un périphérique spécifique
-    midiOutput = juce::MidiOutput::openDevice (midiDevices[0].identifier);
+    // Ouvrir le périphérique sélectionné dans la ComboBox (ou le premier par défaut)
+    int selectedId = midiOutputComboBox.getSelectedId();
+    int deviceIndex = (selectedId > 1) ? (selectedId - 2) : 0;
     
-    if (midiOutput != nullptr)
+    if (deviceIndex >= 0 && deviceIndex < midiDevices.size())
     {
-        juce::Logger::writeToLog ("MIDI Output opened: " + midiDevices[0].name);
-    }
-    else
-    {
-        juce::Logger::writeToLog ("Failed to open MIDI output device: " + midiDevices[0].name);
+        midiOutput = juce::MidiOutput::openDevice (midiDevices[deviceIndex].identifier);
+        
+        if (midiOutput != nullptr)
+        {
+            juce::Logger::writeToLog ("MIDI Output opened: " + midiDevices[deviceIndex].name);
+        }
+        else
+        {
+            juce::Logger::writeToLog ("Failed to open MIDI output device: " + midiDevices[deviceIndex].name);
+        }
     }
 }
 
@@ -402,29 +577,15 @@ void MainComponent::sendControlChange (int channel, int controllerNumber, int co
 void MainComponent::timerCallback()
 {
     // Vérifier périodiquement si la vidéo est arrivée à la fin
-    if (videoComponent.isVideoOpen() && videoComponent.isPlaying())
+    if (videoComponent.isVideoOpen())
     {
-        auto duration = videoComponent.getVideoDuration();
-        auto position = videoComponent.getPlayPosition();
-        
-        // Si on est arrivé à la fin (ou très proche), passer à la vidéo suivante
-        if (duration > 0 && position >= duration - 0.05)
-        {
-            playNextVideo();
+        if (!videoComponent.isPlaying()) {
+            
+            juce::MessageManager::callAsync ([this]()
+            {
+                //playNextVideo();
+                std::cout << "end of video" << std::endl;
+            });
         }
     }
-}
-
-void MainComponent::playNextVideo()
-{
-    if (videoUrls.size() == 0)
-        return;
-    
-    // Passer à la vidéo suivante
-    currentVideoIndex++;
-    currentVideoIndex = currentVideoIndex % videoUrls.size();
-    
-    // Charger la vidéo suivante
-    loadVideoFile (videoUrls[currentVideoIndex]);
-    
 }

@@ -4,6 +4,7 @@
               addUsingNamespaceToJuceHeader="0" jucerFormatVersion="1">
   <MAINGROUP id="HTo9nx" name="BISPlayer">
     <GROUP id="{8B35C404-55BF-E205-C604-71B983926BFF}" name="Source">
+      <FILE id="pFBCpQ" name="Program.h" compile="0" resource="0" file="Source/Program.h"/>
       <FILE id="bEk9gn" name="Main.cpp" compile="1" resource="0" file="Source/Main.cpp"/>
       <FILE id="q53MQG" name="MainComponent.h" compile="0" resource="0" file="Source/MainComponent.h"/>
       <FILE id="KmpsJV" name="MainComponent.cpp" compile="1" resource="0"

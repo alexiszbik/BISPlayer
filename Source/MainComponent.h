@@ -2,6 +2,7 @@
 
 #include <JuceHeader.h>
 #include "ComponentLogger.h"
+#include "Program.h"
 
 //==============================================================================
 /*
@@ -10,7 +11,8 @@
 */
 class MainComponent  : public juce::AudioAppComponent,
                         public juce::MidiInputCallback,
-                        public juce::Timer
+                        public juce::Timer,
+                        public juce::ComboBox::Listener
 {
 public:
     //==============================================================================
@@ -40,6 +42,28 @@ public:
     void sendNoteOff (int channel, int noteNumber, float velocity = 0.0f);
     void sendProgramChange (int channel, int programNumber);
     void sendControlChange (int channel, int controllerNumber, int controllerValue);
+    
+private:
+
+    void loadProgram(Program* pgm);
+    void loadVideoFile (const juce::URL& videoURL);
+    
+    // Méthode pour initialiser l'entrée MIDI
+    void initializeMidiInput();
+    
+    // Méthode pour initialiser la sortie MIDI
+    void initializeMidiOutput();
+    
+    // Méthode pour mettre à jour les ComboBox avec les périphériques disponibles
+    void updateMidiDeviceLists();
+    
+    // ComboBox::Listener
+    void comboBoxChanged (juce::ComboBox* comboBoxThatHasChanged) override;
+    
+    void scanPrograms();
+    
+    // Timer pour vérifier la fin de la vidéo
+    void timerCallback() override;
 
 private:
     //==============================================================================
@@ -48,6 +72,12 @@ private:
     
     // TextEditor pour afficher les logs
     juce::TextEditor logTextEditor;
+    
+    // ComboBox pour sélectionner les périphériques MIDI
+    juce::ComboBox midiInputComboBox;
+    juce::ComboBox midiOutputComboBox;
+    juce::Label midiInputLabel;
+    juce::Label midiOutputLabel;
     
     // Logger personnalisé
     std::unique_ptr<ComponentLogger> componentLogger;
@@ -58,31 +88,12 @@ private:
     // Sortie MIDI
     std::unique_ptr<juce::MidiOutput> midiOutput;
     
-    // Tableau des URLs des fichiers vidéo
-    juce::Array<juce::URL> videoUrls;
-    
     // État de visibilité du logger
     bool isLoggerVisible = true;
     
-    // Méthode pour charger une vidéo depuis une URL
-    void loadVideoFile (const juce::URL& videoURL);
-    
-    // Méthode pour initialiser l'entrée MIDI
-    void initializeMidiInput();
-    
-    // Méthode pour initialiser la sortie MIDI
-    void initializeMidiOutput();
-    
-    // Méthode pour scanner le dossier BIS et remplir videoUrls
-    void scanVideoFiles();
-    
-    // Timer pour vérifier la fin de la vidéo
-    void timerCallback() override;
-    
-    // Méthode pour passer à la vidéo suivante
-    void playNextVideo();
-    
     int currentVideoIndex = 0;
+    
+    std::vector<Program> programs;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MainComponent)
 };

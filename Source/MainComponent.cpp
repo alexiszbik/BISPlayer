@@ -26,6 +26,16 @@ MainComponent::MainComponent()
     logTextEditor.setColour (juce::TextEditor::backgroundColourId, juce::Colours::black);
     logTextEditor.setColour (juce::TextEditor::textColourId, juce::Colours::lightgreen);
     
+    // Configurer le slider pour le threshold
+    thresholdSlider.setRange (0.0, 1.0, 0.01);
+    thresholdSlider.setValue (0.5);
+    thresholdSlider.addListener (this);
+    thresholdSlider.setTextBoxStyle (juce::Slider::TextBoxRight, false, 60, 20);
+    
+    thresholdLabel.setText ("Threshold:", juce::dontSendNotification);
+    thresholdLabel.attachToComponent (&thresholdSlider, true);
+    thresholdLabel.setColour (juce::Label::textColourId, juce::Colours::white);
+    
     // Configurer les labels pour les ComboBox
     midiInputLabel.setText ("MIDI Input:", juce::dontSendNotification);
     midiInputLabel.attachToComponent (&midiInputComboBox, true);
@@ -41,11 +51,16 @@ MainComponent::MainComponent()
     
     //addAndMakeVisible (videoComponent);
     addAndMakeVisible (logTextEditor);
+    addAndMakeVisible (thresholdSlider);
+    addAndMakeVisible (thresholdLabel);
     addAndMakeVisible (midiInputComboBox);
     addAndMakeVisible (midiOutputComboBox);
     addAndMakeVisible (midiInputLabel);
     addAndMakeVisible (midiOutputLabel);
     addAndMakeVisible (capture);
+    
+    // Initialiser le threshold avec la valeur par défaut
+    capture.setThreshold (thresholdSlider.getValue());
     
     // Activer le focus clavier pour recevoir les événements de touches
     setWantsKeyboardFocus (true);
@@ -190,23 +205,30 @@ void MainComponent::resized()
         videoComponent.setBounds (videoBounds);
         capture.setBounds(videoBounds);
         
-        // Zone pour les ComboBox et le logger à droite
+        // Zone pour les contrôles et le logger à droite
         auto rightArea = bounds;
         
-        // Réserver de l'espace pour les ComboBox en haut
-        const int comboBoxHeight = 30;
+        // Réserver de l'espace pour les contrôles en haut
+        const int controlHeight = 30;
         const int labelWidth = 100;
         const int spacing = 5;
         
-        auto comboBoxArea = rightArea.removeFromTop (comboBoxHeight * 2 + spacing);
+        auto controlsArea = rightArea.removeFromTop (controlHeight * 3 + spacing * 2);
+        
+        // Positionner le slider threshold en premier
+        auto thresholdArea = controlsArea.removeFromTop (controlHeight);
+        thresholdLabel.setBounds (thresholdArea.removeFromLeft (labelWidth));
+        thresholdSlider.setBounds (thresholdArea);
+        
+        controlsArea.removeFromTop (spacing);
         
         // Positionner les ComboBox
-        auto inputArea = comboBoxArea.removeFromTop (comboBoxHeight);
+        auto inputArea = controlsArea.removeFromTop (controlHeight);
         midiInputLabel.setBounds (inputArea.removeFromLeft (labelWidth));
         midiInputComboBox.setBounds (inputArea);
         
-        comboBoxArea.removeFromTop (spacing);
-        auto outputArea = comboBoxArea.removeFromTop (comboBoxHeight);
+        controlsArea.removeFromTop (spacing);
+        auto outputArea = controlsArea.removeFromTop (controlHeight);
         midiOutputLabel.setBounds (outputArea.removeFromLeft (labelWidth));
         midiOutputComboBox.setBounds (outputArea);
         
@@ -219,6 +241,8 @@ void MainComponent::resized()
         videoComponent.setBounds (bounds);
         capture.setBounds(bounds);
         logTextEditor.setBounds (0, 0, 0, 0);  // Caché
+        thresholdSlider.setBounds (0, 0, 0, 0);  // Caché
+        thresholdLabel.setBounds (0, 0, 0, 0);  // Caché
         midiInputComboBox.setBounds (0, 0, 0, 0);  // Caché
         midiOutputComboBox.setBounds (0, 0, 0, 0);  // Caché
         midiInputLabel.setBounds (0, 0, 0, 0);  // Caché
@@ -233,6 +257,8 @@ bool MainComponent::keyPressed (const juce::KeyPress& key)
     {
         isLoggerVisible = !isLoggerVisible;
         logTextEditor.setVisible (isLoggerVisible);
+        thresholdSlider.setVisible (isLoggerVisible);
+        thresholdLabel.setVisible (isLoggerVisible);
         midiInputComboBox.setVisible (isLoggerVisible);
         midiOutputComboBox.setVisible (isLoggerVisible);
         midiInputLabel.setVisible (isLoggerVisible);
@@ -396,6 +422,15 @@ void MainComponent::updateMidiDeviceLists()
         midiOutputComboBox.setSelectedId (2);
     else
         midiOutputComboBox.setSelectedId (1);
+}
+
+void MainComponent::sliderValueChanged (juce::Slider* slider)
+{
+    if (slider == &thresholdSlider)
+    {
+        float thresholdValue = (float)thresholdSlider.getValue();
+        capture.setThreshold (thresholdValue);
+    }
 }
 
 void MainComponent::comboBoxChanged (juce::ComboBox* comboBoxThatHasChanged)

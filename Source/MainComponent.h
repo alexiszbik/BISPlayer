@@ -13,7 +13,8 @@
 class MainComponent  : public juce::AudioAppComponent,
                         public juce::MidiInputCallback,
                         public juce::Timer,
-                        public juce::ComboBox::Listener
+                        public juce::ComboBox::Listener,
+                        public juce::Slider::Listener
 {
 public:
     //==============================================================================
@@ -61,6 +62,9 @@ private:
     // ComboBox::Listener
     void comboBoxChanged (juce::ComboBox* comboBoxThatHasChanged) override;
     
+    // Slider::Listener
+    void sliderValueChanged (juce::Slider* slider) override;
+    
     void scanPrograms();
     
     // Timer pour vérifier la fin de la vidéo
@@ -74,6 +78,10 @@ private:
     
     // TextEditor pour afficher les logs
     juce::TextEditor logTextEditor;
+    
+    // Slider pour contrôler le threshold de la caméra
+    juce::Slider thresholdSlider;
+    juce::Label thresholdLabel;
     
     // ComboBox pour sélectionner les périphériques MIDI
     juce::ComboBox midiInputComboBox;

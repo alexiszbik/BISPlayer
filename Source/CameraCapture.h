@@ -33,6 +33,10 @@ public:
         takePhotoButton.setBounds(10, 10, 120, 30);
     }
     
+    void setThreshold(float value) {
+        threshold = (int)(value * 255.f);
+    }
+    
     void imageReceived(const juce::Image& image) override
     {
         auto now = juce::Time::getMillisecondCounter();
@@ -41,7 +45,7 @@ public:
 
         lastUpdateTime = now;
 
-        const int tileSize = 16; // taille de la tuile pour le pixel art
+        const int tileSize = 8; // taille de la tuile pour le pixel art
 
         // Image noir et blanc
         juce::Image bwImage(juce::Image::RGB, image.getWidth(), image.getHeight(), false);
@@ -72,7 +76,7 @@ public:
 
                 // Seuil pour noir/blanc
                 uint8 avgGrey = static_cast<uint8>(sumGrey / count);
-                juce::Colour tileColour = (avgGrey < 128) ? juce::Colours::black : juce::Colours::white;
+                juce::Colour tileColour = (avgGrey < threshold) ? juce::Colours::black : juce::Colours::white;
 
                 // Remplissage du bloc
                 for (int y = by; y < by + tileSize && y < image.getHeight(); ++y)
@@ -110,20 +114,66 @@ private:
     juce::TextButton takePhotoButton;
     
     uint32 lastUpdateTime = 0;
+    
+    int threshold = 127;
 
 
     void takePhoto()
     {
         const juce::ScopedLock lock(imageLock);
 
-        if (currentFrame.isValid())
+        if (!currentFrame.isValid())
+            return;
+
+        const int tileSize = 8; // doit être le même que dans imageReceived
+
+        int w = currentFrame.getWidth();
+        int h = currentFrame.getHeight();
+
+        // Taille de l'image pixelisée réelle
+        int pixelW = w / tileSize;
+        int pixelH = h / tileSize;
+
+        juce::Image pixelImage(juce::Image::RGB, pixelW, pixelH, false);
+        juce::Image::BitmapData src(currentFrame, juce::Image::BitmapData::readOnly);
+        juce::Image::BitmapData dst(pixelImage, juce::Image::BitmapData::writeOnly);
+
+        // Calcul de la couleur moyenne pour chaque bloc
+        for (int by = 0; by < pixelH; ++by)
         {
-            auto file = juce::File::getSpecialLocation(juce::File::userDesktopDirectory)
-                            .getChildFile("photo_NB.png");
-            juce::PNGImageFormat png;
-            juce::FileOutputStream stream(file);
-            png.writeImageToStream(currentFrame, stream);
-            DBG("Photo saved to: " << file.getFullPathName());
+            for (int bx = 0; bx < pixelW; ++bx)
+            {
+                int sumGrey = 0;
+                int count = 0;
+
+                // Parcours des pixels du bloc
+                for (int y = by * tileSize; y < (by + 1) * tileSize && y < h; ++y)
+                {
+                    for (int x = bx * tileSize; x < (bx + 1) * tileSize && x < w; ++x)
+                    {
+                        auto c = src.getPixelColour(x, y);
+                        uint8 grey = static_cast<uint8>(0.299f * c.getRed()
+                                                     + 0.587f * c.getGreen()
+                                                     + 0.114f * c.getBlue());
+                        sumGrey += grey;
+                        ++count;
+                    }
+                }
+
+                uint8 avgGrey = static_cast<uint8>(sumGrey / count);
+                juce::Colour tileColour = (avgGrey < threshold) ? juce::Colours::black : juce::Colours::white;
+
+                dst.setPixelColour(bx, by, tileColour);
+            }
         }
+
+        // Sauvegarde
+        auto file = juce::File::getSpecialLocation(juce::File::userDesktopDirectory)
+                        .getChildFile("photo_pixelArt.png");
+        juce::PNGImageFormat png;
+        juce::FileOutputStream stream(file);
+        png.writeImageToStream(pixelImage, stream);
+        DBG("Photo saved to: " << file.getFullPathName());
     }
+
 };

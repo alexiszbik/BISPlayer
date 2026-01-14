@@ -39,12 +39,13 @@ MainComponent::MainComponent()
     midiInputComboBox.addListener (this);
     midiOutputComboBox.addListener (this);
     
-    addAndMakeVisible (videoComponent);
+    //addAndMakeVisible (videoComponent);
     addAndMakeVisible (logTextEditor);
     addAndMakeVisible (midiInputComboBox);
     addAndMakeVisible (midiOutputComboBox);
     addAndMakeVisible (midiInputLabel);
     addAndMakeVisible (midiOutputLabel);
+    addAndMakeVisible (capture);
     
     // Activer le focus clavier pour recevoir les événements de touches
     setWantsKeyboardFocus (true);
@@ -96,7 +97,7 @@ MainComponent::MainComponent()
     // Charger automatiquement la première vidéo si disponible
     if (programs.size() > 0)
     {
-        loadProgram(&programs[0]);
+        //loadProgram(&programs[0]);
         //loadVideoFile (videoUrls[0]);
     } else {
         abort();
@@ -187,6 +188,7 @@ void MainComponent::resized()
         // Diviser l'espace : vidéo à gauche, log à droite
         auto videoBounds = bounds.removeFromLeft (bounds.getWidth() * 2 / 3);
         videoComponent.setBounds (videoBounds);
+        capture.setBounds(videoBounds);
         
         // Zone pour les ComboBox et le logger à droite
         auto rightArea = bounds;
@@ -215,6 +217,7 @@ void MainComponent::resized()
     {
         // Le lecteur vidéo prend toute la taille du composant
         videoComponent.setBounds (bounds);
+        capture.setBounds(bounds);
         logTextEditor.setBounds (0, 0, 0, 0);  // Caché
         midiInputComboBox.setBounds (0, 0, 0, 0);  // Caché
         midiOutputComboBox.setBounds (0, 0, 0, 0);  // Caché

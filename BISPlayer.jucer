@@ -4,6 +4,7 @@
               addUsingNamespaceToJuceHeader="0" jucerFormatVersion="1">
   <MAINGROUP id="HTo9nx" name="BISPlayer">
     <GROUP id="{8B35C404-55BF-E205-C604-71B983926BFF}" name="Source">
+      <FILE id="R7Tpoh" name="CameraCapture.h" compile="0" resource="0" file="Source/CameraCapture.h"/>
       <FILE id="pFBCpQ" name="Program.h" compile="0" resource="0" file="Source/Program.h"/>
       <FILE id="bEk9gn" name="Main.cpp" compile="1" resource="0" file="Source/Main.cpp"/>
       <FILE id="q53MQG" name="MainComponent.h" compile="0" resource="0" file="Source/MainComponent.h"/>
@@ -27,9 +28,10 @@
     <MODULE id="juce_gui_extra" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
     <MODULE id="juce_video" showAllCode="1" useLocalCopy="0" useGlobalPath="0"/>
   </MODULES>
-  <JUCEOPTIONS JUCE_STRICT_REFCOUNTEDPOINTER="1"/>
+  <JUCEOPTIONS JUCE_STRICT_REFCOUNTEDPOINTER="1" JUCE_USE_CAMERA="1"/>
   <EXPORTFORMATS>
-    <XCODE_MAC targetFolder="Builds/MacOSX" microphonePermissionNeeded="1" microphonePermissionsText="App require mic input!">
+    <XCODE_MAC targetFolder="Builds/MacOSX" microphonePermissionNeeded="1" microphonePermissionsText="App require mic input!"
+               cameraPermissionNeeded="1" cameraPermissionText="App require camera!">
       <CONFIGURATIONS>
         <CONFIGURATION isDebug="1" name="Debug" targetName="BISPlayer"/>
         <CONFIGURATION isDebug="0" name="Release" targetName="BISPlayer"/>

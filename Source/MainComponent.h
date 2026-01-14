@@ -3,6 +3,7 @@
 #include <JuceHeader.h>
 #include "ComponentLogger.h"
 #include "Program.h"
+#include "CameraCapture.h"
 
 //==============================================================================
 /*
@@ -69,6 +70,7 @@ private:
     //==============================================================================
     // Your private member variables go here...
     juce::VideoComponent videoComponent;
+    CameraCapture capture;
     
     // TextEditor pour afficher les logs
     juce::TextEditor logTextEditor;

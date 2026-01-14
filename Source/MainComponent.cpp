@@ -131,6 +131,9 @@ MainComponent::~MainComponent()
 void MainComponent::loadProgram(Program* pgm) {
     auto videoUrl = pgm->getVideoUrl();
     loadVideoFile(videoUrl);
+    
+    sendProgramChange(16,pgm->getMatrixProgram());
+    sendNoteOn(15, pgm->getPrinterNote(), 1.0f);
 }
 
 //==============================================================================

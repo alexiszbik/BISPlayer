@@ -24,7 +24,8 @@ public:
             juce::MessageManager::callAsync ([this, message]()
             {
                 auto timestamp = juce::Time::getCurrentTime().formatted ("%H:%M:%S");
-                auto logLine = "[" + timestamp + "] " + message + "\n";
+                //auto logLine = "[" + timestamp + "] " + message + "\n";
+                auto logLine = "> " +  message + "\n";
                 
                 logTextEditor->moveCaretToEnd();
                 logTextEditor->insertTextAtCaret (logLine);

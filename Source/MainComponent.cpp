@@ -13,10 +13,11 @@ int randomBetween(int x, int y) {
 MainComponent::MainComponent()
     : videoComponent (false)  // false = pas de contrôles natifs, on gère nous-mêmes
 {
-    // Make sure you set the size of the component after
-    // you add any child components.
-    setSize (1200, 600);
     
+    // Créer le logger personnalisé
+    componentLogger = std::make_unique<ComponentLogger> (&logTextEditor);
+    juce::Logger::setCurrentLogger (componentLogger.get());
+
     // Configurer le TextEditor pour les logs
     logTextEditor.setMultiLine (true);
     logTextEditor.setReturnKeyStartsNewLine (true);
@@ -49,6 +50,8 @@ MainComponent::MainComponent()
     midiInputComboBox.addListener (this);
     midiOutputComboBox.addListener (this);
     
+    capture = std::make_unique<CameraCapture>();
+    
     //addAndMakeVisible (videoComponent);
     addAndMakeVisible (logTextEditor);
     addAndMakeVisible (thresholdSlider);
@@ -57,17 +60,15 @@ MainComponent::MainComponent()
     addAndMakeVisible (midiOutputComboBox);
     addAndMakeVisible (midiInputLabel);
     addAndMakeVisible (midiOutputLabel);
-    addAndMakeVisible (capture);
+    addAndMakeVisible (capture.get());
     
     // Initialiser le threshold avec la valeur par défaut
-    capture.setThreshold (thresholdSlider.getValue());
+    capture->setThreshold (thresholdSlider.getValue());
     
     // Activer le focus clavier pour recevoir les événements de touches
     setWantsKeyboardFocus (true);
     
-    // Créer le logger personnalisé
-    componentLogger = std::make_unique<ComponentLogger> (&logTextEditor);
-    juce::Logger::setCurrentLogger (componentLogger.get());
+
     
     // Configurer le callback pour détecter la fin de la vidéo
     // Utiliser MessageManager::callAsync pour s'assurer que l'appel est thread-safe
@@ -117,6 +118,11 @@ MainComponent::MainComponent()
     } else {
         abort();
     }
+    
+    // Make sure you set the size of the component after
+    // you add any child components.
+    setSize (1200, 600);
+    
 }
 
 MainComponent::~MainComponent()
@@ -203,7 +209,7 @@ void MainComponent::resized()
         // Diviser l'espace : vidéo à gauche, log à droite
         auto videoBounds = bounds.removeFromLeft (bounds.getWidth() * 2 / 3);
         videoComponent.setBounds (videoBounds);
-        capture.setBounds(videoBounds);
+        capture->setBounds(videoBounds);
         
         // Zone pour les contrôles et le logger à droite
         auto rightArea = bounds;
@@ -239,7 +245,7 @@ void MainComponent::resized()
     {
         // Le lecteur vidéo prend toute la taille du composant
         videoComponent.setBounds (bounds);
-        capture.setBounds(bounds);
+        capture->setBounds(bounds);
         logTextEditor.setBounds (0, 0, 0, 0);  // Caché
         thresholdSlider.setBounds (0, 0, 0, 0);  // Caché
         thresholdLabel.setBounds (0, 0, 0, 0);  // Caché
@@ -266,6 +272,46 @@ bool MainComponent::keyPressed (const juce::KeyPress& key)
         resized();  // Recalculer le layout
         return true;  // Consommer l'événement
     }
+    if (key.getTextCharacter() == 'd' || key.getTextCharacter() == 'D')
+    {
+        int k = 3;
+        while(k--) {
+            juce::Thread::sleep (20);
+            
+            sendControlChange(15, 60, 60);
+            int len = 192;
+            bool state = true;
+            
+            uint8 chan = 15;
+            
+            juce::Thread::sleep (20);
+            
+            for (int i = 0; i < len; i++) {
+                
+                if (state) {
+                    sendNoteOn(chan, (uint8)127, (uint8)127, false);
+                    juce::Thread::sleep (1);
+                    sendNoteOn(chan, (uint8)127, (uint8)127, false);
+                    juce::Thread::sleep (1);
+                    sendNoteOn(chan, (uint8)127, (uint8)127, false);
+                    juce::Thread::sleep (1);
+                } else {
+                    sendNoteOn(chan, (uint8)1, (uint8)1, false);
+                    juce::Thread::sleep (1);
+                    sendNoteOn(chan, (uint8)1, (uint8)1, false);
+                    juce::Thread::sleep (1);
+                    sendNoteOn(chan, (uint8)1, (uint8)1, false);
+                    juce::Thread::sleep (1);
+                }
+                state = !state;
+                //juce::Thread::sleep (20);
+                
+            }
+            juce::Thread::sleep (20);
+            sendControlChange(15, 60, 60);
+        }
+        
+    }
     
     return false;  // Laisser passer les autres touches
 }
@@ -287,6 +333,8 @@ void MainComponent::loadVideoFile (const juce::URL& videoURL)
             juce::Logger::writeToLog ("Failed to load video: " + result.getErrorMessage());
         }
     });
+    
+    
     /*
      static int pgm = 70;
      pgm++;
@@ -429,7 +477,7 @@ void MainComponent::sliderValueChanged (juce::Slider* slider)
     if (slider == &thresholdSlider)
     {
         float thresholdValue = (float)thresholdSlider.getValue();
-        capture.setThreshold (thresholdValue);
+        capture->setThreshold (thresholdValue);
     }
 }
 
@@ -559,30 +607,34 @@ void MainComponent::initializeMidiOutput()
     }
 }
 
-void MainComponent::sendNoteOn (int channel, int noteNumber, float velocity)
+void MainComponent::sendNoteOn (int channel, int noteNumber, uint8 velocity, bool log)
 {
     if (midiOutput != nullptr)
     {
         // Les canaux MIDI sont de 1-16, mais MidiMessage utilise 0-15
         juce::MidiMessage message = juce::MidiMessage::noteOn (channel, noteNumber, velocity);
         midiOutput->sendMessageNow (message);
+        if (log) {
+            juce::Logger::writeToLog ("MIDI OUT Note On - Channel: " + juce::String (channel) +
+                                       ", Note: " + juce::String (noteNumber) +
+                                       ", Velocity: " + juce::String (velocity));
+        }
         
-        juce::Logger::writeToLog ("MIDI OUT Note On - Channel: " + juce::String (channel) + 
-                                   ", Note: " + juce::String (noteNumber) + 
-                                   ", Velocity: " + juce::String ((int)(velocity * 127)));
     }
 }
 
-void MainComponent::sendNoteOff (int channel, int noteNumber, float velocity)
+void MainComponent::sendNoteOff (int channel, int noteNumber, uint8 velocity, bool log)
 {
     if (midiOutput != nullptr)
     {
         juce::MidiMessage message = juce::MidiMessage::noteOff (channel, noteNumber, velocity);
         midiOutput->sendMessageNow (message);
+        if (log) {
+            juce::Logger::writeToLog ("MIDI OUT Note Off - Channel: " + juce::String (channel) +
+                                       ", Note: " + juce::String (noteNumber) +
+                                       ", Velocity: " + juce::String (velocity));
+        }
         
-        juce::Logger::writeToLog ("MIDI OUT Note Off - Channel: " + juce::String (channel) + 
-                                   ", Note: " + juce::String (noteNumber) + 
-                                   ", Velocity: " + juce::String ((int)(velocity * 127)));
     }
 }
 

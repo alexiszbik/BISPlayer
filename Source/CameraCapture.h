@@ -8,8 +8,13 @@ class CameraCapture : public juce::Component,
 public:
     CameraCapture()
     {
+        
+        auto devices = juce::CameraDevice::getAvailableDevices();
+        for (auto& d : devices) {
+            juce::Logger::writeToLog (d);
+        }
         // Ouvrir la première caméra
-        camera.reset(juce::CameraDevice::openDevice(0, 128, 128, 128, 128));
+        camera.reset(juce::CameraDevice::openDevice(0));
 
         if (camera)
             camera->addListener(this);
@@ -45,8 +50,6 @@ public:
 
         lastUpdateTime = now;
 
-        const int tileSize = 8; // taille de la tuile pour le pixel art
-
         // Image noir et blanc
         juce::Image bwImage(juce::Image::RGB, image.getWidth(), image.getHeight(), false);
 
@@ -57,26 +60,7 @@ public:
         {
             for (int bx = 0; bx < image.getWidth(); bx += tileSize)
             {
-                int sumGrey = 0;
-                int count = 0;
-
-                // Calcul de la moyenne du bloc
-                for (int y = by; y < by + tileSize && y < image.getHeight(); ++y)
-                {
-                    for (int x = bx; x < bx + tileSize && x < image.getWidth(); ++x)
-                    {
-                        auto c = src.getPixelColour(x, y);
-                        uint8 grey = static_cast<uint8>(0.299f * c.getRed()
-                                                     + 0.587f * c.getGreen()
-                                                     + 0.114f * c.getBlue());
-                        sumGrey += grey;
-                        ++count;
-                    }
-                }
-
-                // Seuil pour noir/blanc
-                uint8 avgGrey = static_cast<uint8>(sumGrey / count);
-                juce::Colour tileColour = (avgGrey < threshold) ? juce::Colours::black : juce::Colours::white;
+                juce::Colour tileColour = processBlockToColour(src, bx, by, image.getWidth(), image.getHeight());
 
                 // Remplissage du bloc
                 for (int y = by; y < by + tileSize && y < image.getHeight(); ++y)
@@ -107,6 +91,8 @@ public:
     }
 
 private:
+    static constexpr int tileSize = 10; // taille de la tuile pour le pixel art
+    
     std::unique_ptr<juce::CameraDevice> camera;
     juce::Image currentFrame;
     juce::CriticalSection imageLock;
@@ -117,15 +103,41 @@ private:
     
     int threshold = 127;
 
+    // Calcule la couleur (noir ou blanc) pour un bloc donné dans une image
+    juce::Colour processBlockToColour(const juce::Image::BitmapData& src, 
+                                      int blockX, int blockY, 
+                                      int imageWidth, int imageHeight)
+    {
+        int sumGrey = 0;
+        int count = 0;
+
+        // Calcul de la moyenne du bloc
+        for (int y = blockY; y < blockY + tileSize && y < imageHeight; ++y)
+        {
+            for (int x = blockX; x < blockX + tileSize && x < imageWidth; ++x)
+            {
+                auto c = src.getPixelColour(x, y);
+                uint8 grey = static_cast<uint8>(0.299f * c.getRed()
+                                             + 0.587f * c.getGreen()
+                                             + 0.114f * c.getBlue());
+                sumGrey += grey;
+                ++count;
+            }
+        }
+
+        // Seuil pour noir/blanc
+        uint8 avgGrey = static_cast<uint8>(sumGrey / count);
+        return (avgGrey < threshold) ? juce::Colours::black : juce::Colours::white;
+    }
 
     void takePhoto()
     {
+        //La photo devrait faire 192 par 108
+        
         const juce::ScopedLock lock(imageLock);
 
         if (!currentFrame.isValid())
             return;
-
-        const int tileSize = 8; // doit être le même que dans imageReceived
 
         int w = currentFrame.getWidth();
         int h = currentFrame.getHeight();
@@ -143,26 +155,9 @@ private:
         {
             for (int bx = 0; bx < pixelW; ++bx)
             {
-                int sumGrey = 0;
-                int count = 0;
-
-                // Parcours des pixels du bloc
-                for (int y = by * tileSize; y < (by + 1) * tileSize && y < h; ++y)
-                {
-                    for (int x = bx * tileSize; x < (bx + 1) * tileSize && x < w; ++x)
-                    {
-                        auto c = src.getPixelColour(x, y);
-                        uint8 grey = static_cast<uint8>(0.299f * c.getRed()
-                                                     + 0.587f * c.getGreen()
-                                                     + 0.114f * c.getBlue());
-                        sumGrey += grey;
-                        ++count;
-                    }
-                }
-
-                uint8 avgGrey = static_cast<uint8>(sumGrey / count);
-                juce::Colour tileColour = (avgGrey < threshold) ? juce::Colours::black : juce::Colours::white;
-
+                int blockX = bx * tileSize;
+                int blockY = by * tileSize;
+                juce::Colour tileColour = processBlockToColour(src, blockX, blockY, w, h);
                 dst.setPixelColour(bx, by, tileColour);
             }
         }
@@ -170,6 +165,9 @@ private:
         // Sauvegarde
         auto file = juce::File::getSpecialLocation(juce::File::userDesktopDirectory)
                         .getChildFile("photo_pixelArt.png");
+        if (file.exists() ) {
+            file.deleteFile();
+        }
         juce::PNGImageFormat png;
         juce::FileOutputStream stream(file);
         png.writeImageToStream(pixelImage, stream);

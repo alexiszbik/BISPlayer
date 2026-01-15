@@ -40,8 +40,8 @@ public:
     
     //==============================================================================
     // Méthodes pour envoyer des messages MIDI
-    void sendNoteOn (int channel, int noteNumber, float velocity);
-    void sendNoteOff (int channel, int noteNumber, float velocity = 0.0f);
+    void sendNoteOn (int channel, int noteNumber, uint8 velocity, bool log = true);
+    void sendNoteOff (int channel, int noteNumber, uint8 velocity, bool log = true);
     void sendProgramChange (int channel, int programNumber);
     void sendControlChange (int channel, int controllerNumber, int controllerValue);
     
@@ -74,7 +74,7 @@ private:
     //==============================================================================
     // Your private member variables go here...
     juce::VideoComponent videoComponent;
-    CameraCapture capture;
+    std::unique_ptr<CameraCapture> capture;
     
     // TextEditor pour afficher les logs
     juce::TextEditor logTextEditor;

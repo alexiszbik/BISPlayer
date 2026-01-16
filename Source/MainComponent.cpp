@@ -46,13 +46,20 @@ MainComponent::MainComponent()
     midiOutputLabel.attachToComponent (&midiOutputComboBox, true);
     midiOutputLabel.setColour (juce::Label::textColourId, juce::Colours::white);
     
-    // Configurer les ComboBox
-    midiInputComboBox.addListener (this);
-    midiOutputComboBox.addListener (this);
+    // Créer le gestionnaire MIDI
+    midiManager = std::make_unique<MidiManager>();
+    midiManager->setupComboBoxes (&midiInputComboBox, &midiOutputComboBox, 
+                                   &midiInputLabel, &midiOutputLabel);
     
-    capture = std::make_unique<CameraCapture>();
+    // Configurer le callback pour les messages MIDI entrants
+    midiManager->onMidiMessageReceived = [this](juce::MidiInput* source, const juce::MidiMessage& message)
+    {
+        handleIncomingMidiMessage (source, message);
+    };
     
-    //addAndMakeVisible (videoComponent);
+    capture = std::make_unique<CameraCapture>(midiManager.get());
+    
+    addAndMakeVisible (videoComponent);
     addAndMakeVisible (logTextEditor);
     addAndMakeVisible (thresholdSlider);
     addAndMakeVisible (thresholdLabel);
@@ -75,20 +82,15 @@ MainComponent::MainComponent()
     
     setAudioChannels (0, 2);
     
-    // Mettre à jour les listes de périphériques MIDI
-    updateMidiDeviceLists();
+    // Mettre à jour les listes de périphériques MIDI et initialiser
+    midiManager->updateDeviceLists();
+    midiManager->initializeDevices();
     
-    // Initialiser l'entrée MIDI
-    initializeMidiInput();
-    
-    // Initialiser la sortie MIDI
-    initializeMidiOutput();
+    capture->setVisible(false);
     
     // Charger automatiquement la première vidéo si disponible
     if (programs.size() > 0)
     {
-        //loadProgram(&programs[0]);
-        //loadVideoFile (videoUrls[0]);
     } else {
         abort();
     }
@@ -96,6 +98,8 @@ MainComponent::MainComponent()
     // Make sure you set the size of the component after
     // you add any child components.
     setSize (1200, 600);
+    
+    idle();
     
 }
 
@@ -111,11 +115,8 @@ MainComponent::~MainComponent()
     // Désenregistrer le logger avant de le détruire
     juce::Logger::setCurrentLogger (nullptr);
     
-    // Fermer l'entrée MIDI
-    midiInput.reset();
-    
-    // Fermer la sortie MIDI
-    midiOutput.reset();
+    // Fermer le gestionnaire MIDI (qui fermera les périphériques)
+    midiManager.reset();
     
     // Fermer le logger
     componentLogger.reset();
@@ -124,12 +125,20 @@ MainComponent::~MainComponent()
     shutdownAudio();
 }
 
+void MainComponent::idle() {
+    midiManager->sendProgramChange(16, 71);
+}
+
 void MainComponent::loadProgram(Program* pgm) {
+    
+    capture->setVisible(false);
+    videoComponent.setVisible(true);
+    
     auto videoUrl = pgm->getVideoUrl();
     loadVideoFile(videoUrl);
     
-    sendProgramChange(16,pgm->getMatrixProgram());
-    sendNoteOn(15, pgm->getPrinterNote(), 1.0f);
+    sendProgramChange(16, pgm->getMatrixProgram());
+    sendNoteOn(15, pgm->getPrinterNote(), 60);
 }
 
 //==============================================================================
@@ -230,49 +239,15 @@ void MainComponent::resized()
     }
 }
 
-void MainComponent::printPhoto() {
-    auto buff = capture->imgBufferForPrint;
-    const int maxLen = 320;
-    
-    for (int yy = 0; yy < 14; yy++) {
-        
-        sendControlChange(15, 60, 60);
-        juce::Thread::sleep (4);
-        
-        int yBase = yy * 24;
-        
-        for (int x = 0; x < 192; x++)
-        {
-            for (int byte = 0; byte < 3; byte++)
-            {
-                uint8_t v = 0;
-
-                for (int bit = 0; bit < 8; bit++)
-                {
-                    int bb = (byte * 8 + bit);
-                    int y = yBase + bb;
-
-                    if (y < maxLen && buff[x][y]) {
-                        v |= (1 << (7 - bit));
-                    }
-                }
-
-                sendByteAsMidi(v);
-            }
-        }
-        
-        juce::Thread::sleep (4);
-        sendControlChange(15, 60, 60);
-        juce::Thread::sleep (2000);
-    }
-    
-}
-
 bool MainComponent::keyPressed (const juce::KeyPress& key)
 {
     // Toggle la visibilité du logger avec la touche K (insensible à la casse)
     if (key.getTextCharacter() == 'k' || key.getTextCharacter() == 'K')
     {
+
+    
+    
+        
         isLoggerVisible = !isLoggerVisible;
         logTextEditor.setVisible (isLoggerVisible);
         thresholdSlider.setVisible (isLoggerVisible);
@@ -285,17 +260,6 @@ bool MainComponent::keyPressed (const juce::KeyPress& key)
         return true;  // Consommer l'événement
     }
     return false;  // Laisser passer les autres touches
-}
-
-
-
-void MainComponent::sendByteAsMidi(uint8_t b)
-{
-    uint8_t note = b & 0x7F;
-    uint8_t vel  = (b & 0x80) ? 1 : 2;
-
-    sendNoteOn(15, note, vel, false);
-    juce::Thread::sleep (1);
 }
 
 
@@ -328,6 +292,13 @@ void MainComponent::loadVideoFile (const juce::URL& videoURL)
      sendNoteOn(16,60, 1.f);*/
 }
 
+
+void MainComponent::stopAndHideVideo() {
+    videoComponent.setVisible(false);
+    videoComponent.stop();
+    capture->setVisible(true);
+}
+
 void MainComponent::handleIncomingMidiMessage (juce::MidiInput* source, const juce::MidiMessage& message)
 {
     juce::String sourceName = "Unknown";
@@ -355,6 +326,32 @@ void MainComponent::handleIncomingMidiMessage (juce::MidiInput* source, const ju
         currentVideoIndex = currentVideoIndex % videoUrls.size();
         
         loadVideoFile (videoUrls[currentVideoIndex]);*/
+        
+        MessageManager::callAsync([noteNumber, this]()
+        {
+            if (noteNumber >= FIRST_NOTE && noteNumber < (programs.size() + FIRST_NOTE)) {
+                
+                loadProgram(&programs[noteNumber - FIRST_NOTE]);
+            } else {
+                
+            }
+            
+            switch (noteNumber) {
+                case 50: {
+                    stopAndHideVideo();
+                }
+                    break;
+                case 51: {
+                    stopAndHideVideo();
+                    capture->startCountdown();
+                }
+                    break;
+                    
+                default:
+                    break;
+            }
+        });
+        
     }
     else if (message.isNoteOff())
     {
@@ -410,50 +407,10 @@ void MainComponent::scanPrograms()
 
     for (const auto& dir : pgmDirs)
     {
-        /*
-        auto extension = file.getFileExtension().toLowerCase();
-        
-        if (extension == ".mov" || extension == ".mp4")
-        {
-            videoUrls.add (juce::URL (file));
-        }*/
         programs.push_back(Program(dir));
     }
 }
 
-void MainComponent::updateMidiDeviceLists()
-{
-    // Mettre à jour la liste des périphériques MIDI Input
-    midiInputComboBox.clear();
-    midiInputComboBox.addItem ("None", 1);
-    
-    auto inputDevices = juce::MidiInput::getAvailableDevices();
-    for (int i = 0; i < inputDevices.size(); ++i)
-    {
-        midiInputComboBox.addItem (inputDevices[i].name, i + 2);
-    }
-    
-    // Mettre à jour la liste des périphériques MIDI Output
-    midiOutputComboBox.clear();
-    midiOutputComboBox.addItem ("None", 1);
-    
-    auto outputDevices = juce::MidiOutput::getAvailableDevices();
-    for (int i = 0; i < outputDevices.size(); ++i)
-    {
-        midiOutputComboBox.addItem (outputDevices[i].name, i + 2);
-    }
-    
-    // Sélectionner le premier périphérique par défaut (ou "None" si aucun)
-    if (inputDevices.size() > 0)
-        midiInputComboBox.setSelectedId (2);
-    else
-        midiInputComboBox.setSelectedId (1);
-    
-    if (outputDevices.size() > 0)
-        midiOutputComboBox.setSelectedId (2);
-    else
-        midiOutputComboBox.setSelectedId (1);
-}
 
 void MainComponent::sliderValueChanged (juce::Slider* slider)
 {
@@ -466,187 +423,41 @@ void MainComponent::sliderValueChanged (juce::Slider* slider)
 
 void MainComponent::comboBoxChanged (juce::ComboBox* comboBoxThatHasChanged)
 {
-    if (comboBoxThatHasChanged == &midiInputComboBox)
-    {
-        // Fermer l'ancien périphérique
-        if (midiInput != nullptr)
-        {
-            midiInput->stop();
-            midiInput.reset();
-        }
-        
-        // Ouvrir le nouveau périphérique si sélectionné
-        int selectedId = midiInputComboBox.getSelectedId();
-        if (selectedId > 1)  // Pas "None"
-        {
-            auto devices = juce::MidiInput::getAvailableDevices();
-            int deviceIndex = selectedId - 2;
-            
-            if (deviceIndex >= 0 && deviceIndex < devices.size())
-            {
-                midiInput = juce::MidiInput::openDevice (devices[deviceIndex].identifier, this);
-                if (midiInput != nullptr)
-                {
-                    midiInput->start();
-                    juce::Logger::writeToLog ("MIDI Input opened: " + devices[deviceIndex].name);
-                }
-            }
-        }
-        else
-        {
-            juce::Logger::writeToLog ("MIDI Input closed");
-        }
-    }
-    else if (comboBoxThatHasChanged == &midiOutputComboBox)
-    {
-        // Fermer l'ancien périphérique
-        midiOutput.reset();
-        
-        // Ouvrir le nouveau périphérique si sélectionné
-        int selectedId = midiOutputComboBox.getSelectedId();
-        if (selectedId > 1)  // Pas "None"
-        {
-            auto devices = juce::MidiOutput::getAvailableDevices();
-            int deviceIndex = selectedId - 2;
-            
-            if (deviceIndex >= 0 && deviceIndex < devices.size())
-            {
-                midiOutput = juce::MidiOutput::openDevice (devices[deviceIndex].identifier);
-                if (midiOutput != nullptr)
-                {
-                    juce::Logger::writeToLog ("MIDI Output opened: " + devices[deviceIndex].name);
-                }
-                else
-                {
-                    juce::Logger::writeToLog ("Failed to open MIDI output device: " + devices[deviceIndex].name);
-                }
-            }
-        }
-        else
-        {
-            juce::Logger::writeToLog ("MIDI Output closed");
-        }
-    }
+    // Les ComboBox MIDI sont maintenant gérées par MidiManager
+    // Cette méthode est conservée pour compatibilité mais ne fait rien
+    // (le thresholdSlider n'utilise pas de ComboBox)
 }
 
-void MainComponent::initializeMidiInput()
-{
-    // Obtenir la liste des périphériques MIDI disponibles
-    auto midiDevices = juce::MidiInput::getAvailableDevices();
-    
-    if (midiDevices.isEmpty())
-    {
-        juce::Logger::writeToLog ("No MIDI input");
-        return;
-    }
-    
-    // Ouvrir le périphérique sélectionné dans la ComboBox (ou le premier par défaut)
-    int selectedId = midiInputComboBox.getSelectedId();
-    int deviceIndex = (selectedId > 1) ? (selectedId - 2) : 0;
-    
-    if (deviceIndex >= 0 && deviceIndex < midiDevices.size())
-    {
-        midiInput = juce::MidiInput::openDevice (midiDevices[deviceIndex].identifier, this);
-        
-        if (midiInput != nullptr)
-        {
-            midiInput->start();
-            juce::Logger::writeToLog ("MIDI Input opened: " + midiDevices[deviceIndex].name);
-        }
-        else
-        {
-            juce::Logger::writeToLog ("Failed to open MIDI device: " + midiDevices[deviceIndex].name);
-        }
-    }
-}
-
-void MainComponent::initializeMidiOutput()
-{
-    // Obtenir la liste des périphériques MIDI de sortie disponibles
-    auto midiDevices = juce::MidiOutput::getAvailableDevices();
-    
-    if (midiDevices.isEmpty())
-    {
-        juce::Logger::writeToLog ("No MIDI output device found");
-        return;
-    }
-    
-    // Ouvrir le périphérique sélectionné dans la ComboBox (ou le premier par défaut)
-    int selectedId = midiOutputComboBox.getSelectedId();
-    int deviceIndex = (selectedId > 1) ? (selectedId - 2) : 0;
-    
-    if (deviceIndex >= 0 && deviceIndex < midiDevices.size())
-    {
-        midiOutput = juce::MidiOutput::openDevice (midiDevices[deviceIndex].identifier);
-        
-        if (midiOutput != nullptr)
-        {
-            juce::Logger::writeToLog ("MIDI Output opened: " + midiDevices[deviceIndex].name);
-        }
-        else
-        {
-            juce::Logger::writeToLog ("Failed to open MIDI output device: " + midiDevices[deviceIndex].name);
-        }
-    }
-}
 
 void MainComponent::sendNoteOn (int channel, int noteNumber, uint8 velocity, bool log)
 {
-    if (midiOutput != nullptr)
+    if (midiManager != nullptr)
     {
-        // Les canaux MIDI sont de 1-16, mais MidiMessage utilise 0-15
-        juce::MidiMessage message = juce::MidiMessage::noteOn (channel, noteNumber, velocity);
-        midiOutput->sendMessageNow (message);
-        if (log) {
-            juce::Logger::writeToLog ("MIDI OUT Note On - Channel: " + juce::String (channel) +
-                                       ", Note: " + juce::String (noteNumber) +
-                                       ", Velocity: " + juce::String (velocity));
-        }
-        
+        midiManager->sendNoteOn (channel, noteNumber, velocity, log);
     }
 }
 
 void MainComponent::sendNoteOff (int channel, int noteNumber, uint8 velocity, bool log)
 {
-    if (midiOutput != nullptr)
+    if (midiManager != nullptr)
     {
-        juce::MidiMessage message = juce::MidiMessage::noteOff (channel, noteNumber, velocity);
-        midiOutput->sendMessageNow (message);
-        if (log) {
-            juce::Logger::writeToLog ("MIDI OUT Note Off - Channel: " + juce::String (channel) +
-                                       ", Note: " + juce::String (noteNumber) +
-                                       ", Velocity: " + juce::String (velocity));
-        }
-        
+        midiManager->sendNoteOff (channel, noteNumber, velocity, log);
     }
 }
 
 void MainComponent::sendProgramChange (int channel, int programNumber)
 {
-    if (midiOutput != nullptr)
+    if (midiManager != nullptr)
     {
-        // Les canaux MIDI sont de 1-16, mais MidiMessage utilise 0-15
-        // Les numéros de programme sont de 0-127
-        juce::MidiMessage message = juce::MidiMessage::programChange (channel, programNumber);
-        midiOutput->sendMessageNow (message);
-        
-        juce::Logger::writeToLog ("MIDI OUT Program Change - Channel: " + juce::String (channel) + 
-                                   ", Program: " + juce::String (programNumber));
+        midiManager->sendProgramChange (channel, programNumber);
     }
 }
 
 void MainComponent::sendControlChange (int channel, int controllerNumber, int controllerValue)
 {
-    if (midiOutput != nullptr)
+    if (midiManager != nullptr)
     {
-        // Les canaux MIDI sont de 1-16, mais MidiMessage utilise 0-15
-        // Les numéros de contrôleur et valeurs sont de 0-127
-        juce::MidiMessage message = juce::MidiMessage::controllerEvent (channel, controllerNumber, controllerValue);
-        midiOutput->sendMessageNow (message);
-        
-        juce::Logger::writeToLog ("MIDI OUT Control Change - Channel: " + juce::String (channel) + 
-                                   ", CC: " + juce::String (controllerNumber) + 
-                                   ", Value: " + juce::String (controllerValue));
+        midiManager->sendControlChange (channel, controllerNumber, controllerValue);
     }
 }
 
@@ -660,7 +471,7 @@ void MainComponent::timerCallback()
             juce::MessageManager::callAsync ([this]()
             {
                 //playNextVideo();
-                std::cout << "end of video" << std::endl;
+                //std::cout << "end of video" << std::endl;
             });
         }
     }

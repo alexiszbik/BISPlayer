@@ -4,6 +4,9 @@
 #include "ComponentLogger.h"
 #include "Program.h"
 #include "CameraCapture.h"
+#include "MidiManager.h"
+
+#define FIRST_NOTE 36
 
 //==============================================================================
 /*
@@ -11,7 +14,6 @@
     your controls and content.
 */
 class MainComponent  : public juce::AudioAppComponent,
-                        public juce::MidiInputCallback,
                         public juce::Timer,
                         public juce::ComboBox::Listener,
                         public juce::Slider::Listener
@@ -35,34 +37,22 @@ public:
     bool keyPressed (const juce::KeyPress& key) override;
     
     //==============================================================================
-    // MidiInputCallback
-    void handleIncomingMidiMessage (juce::MidiInput* source, const juce::MidiMessage& message) override;
-    
-    //==============================================================================
-    // Méthodes pour envoyer des messages MIDI
+    // Méthodes pour envoyer des messages MIDI (déléguées à MidiManager)
     void sendNoteOn (int channel, int noteNumber, uint8 velocity, bool log = true);
     void sendNoteOff (int channel, int noteNumber, uint8 velocity, bool log = true);
     void sendProgramChange (int channel, int programNumber);
     void sendControlChange (int channel, int controllerNumber, int controllerValue);
     
-    void sendByteAsMidi(uint8_t b);
-    void printPhoto();
     
 private:
 
     void loadProgram(Program* pgm);
     void loadVideoFile (const juce::URL& videoURL);
     
-    // Méthode pour initialiser l'entrée MIDI
-    void initializeMidiInput();
+    // Gestion des messages MIDI entrants (appelée par MidiManager)
+    void handleIncomingMidiMessage (juce::MidiInput* source, const juce::MidiMessage& message);
     
-    // Méthode pour initialiser la sortie MIDI
-    void initializeMidiOutput();
-    
-    // Méthode pour mettre à jour les ComboBox avec les périphériques disponibles
-    void updateMidiDeviceLists();
-    
-    // ComboBox::Listener
+    // ComboBox::Listener (pour le thresholdSlider uniquement)
     void comboBoxChanged (juce::ComboBox* comboBoxThatHasChanged) override;
     
     // Slider::Listener
@@ -72,6 +62,9 @@ private:
     
     // Timer pour vérifier la fin de la vidéo
     void timerCallback() override;
+    
+    void stopAndHideVideo();
+    void idle();
 
 private:
     //==============================================================================
@@ -95,11 +88,8 @@ private:
     // Logger personnalisé
     std::unique_ptr<ComponentLogger> componentLogger;
     
-    // Entrée MIDI
-    std::unique_ptr<juce::MidiInput> midiInput;
-    
-    // Sortie MIDI
-    std::unique_ptr<juce::MidiOutput> midiOutput;
+    // Gestionnaire MIDI
+    std::unique_ptr<MidiManager> midiManager;
     
     // État de visibilité du logger
     bool isLoggerVisible = true;

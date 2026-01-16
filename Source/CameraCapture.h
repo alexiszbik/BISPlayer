@@ -2,13 +2,14 @@
 
 #include <JuceHeader.h>
 #include <stdlib.h>
+#include "MidiManager.h"
 
 class CameraCapture : public juce::Component,
                       public juce::CameraDevice::Listener,
                       public juce::Timer
 {
 public:
-    CameraCapture();
+    CameraCapture(MidiManager* midiManager);
     ~CameraCapture() override;
 
     void resized() override;
@@ -17,15 +18,13 @@ public:
     void setThreshold(float value);
     void imageReceived(const juce::Image& image) override;
     void timerCallback() override;
-    
-    // Buffers publics pour l'accès depuis MainComponent
-    bool imgBuffer[320][180];
-    bool imgBufferForPrint[192][320];
 
+    void startCountdown();
+    
 private:
     static constexpr int tileSize = 6; // taille de la tuile pour le pixel art
+    void printPhoto();
     
-    void startCountdown();
     void takePhoto();
     bool processBlockToColour(const juce::Image::BitmapData& src,
                               int blockX, int blockY,
@@ -44,4 +43,9 @@ private:
     // Variables pour le décompte
     int countdownValue = 0;
     bool isCountingDown = false;
+    
+    MidiManager* mmRef = nullptr;
+
+    bool imgBuffer[320][180];
+    bool imgBufferForPrint[192][320];
 };

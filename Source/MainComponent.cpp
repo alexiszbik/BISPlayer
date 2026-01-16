@@ -314,13 +314,14 @@ bool MainComponent::keyPressed (const juce::KeyPress& key)
             sendControlChange(15, 60, 60);
         }*/
         
-        auto buff = capture->imgBuffer;
+        auto buff = capture->imgBufferForPrint;
+        const int maxLen = 320;
         
-        for (int yy = 0; yy < 4; yy++) {
+        
+        for (int yy = 0; yy < 14; yy++) {
             
-            juce::Thread::sleep (20);
             sendControlChange(15, 60, 60);
-            juce::Thread::sleep (20);
+            juce::Thread::sleep (4);
             
             int yBase = yy * 24;
             
@@ -335,7 +336,7 @@ bool MainComponent::keyPressed (const juce::KeyPress& key)
                         int bb = (byte * 8 + bit);
                         int y = yBase + bb;
 
-                        if (y < 108 && buff[x][y]) {
+                        if (y < maxLen && buff[x][y]) {
                             v |= (1 << (7 - bit));
                         }
                     }
@@ -344,7 +345,7 @@ bool MainComponent::keyPressed (const juce::KeyPress& key)
                 }
             }
             
-            juce::Thread::sleep (20);
+            juce::Thread::sleep (4);
             sendControlChange(15, 60, 60);
             juce::Thread::sleep (2000);
         }

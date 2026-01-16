@@ -27,7 +27,8 @@ public:
         setSize(640, 480);
     }
     
-    bool imgBuffer[192][108];
+    bool imgBuffer[320][180];
+    bool imgBufferForPrint[192][320];
 
     ~CameraCapture() override
     {
@@ -93,7 +94,7 @@ public:
     }
 
 private:
-    static constexpr int tileSize = 10; // taille de la tuile pour le pixel art
+    static constexpr int tileSize = 6; // taille de la tuile pour le pixel art
     
     std::unique_ptr<juce::CameraDevice> camera;
     juce::Image currentFrame;
@@ -149,6 +150,9 @@ private:
         // Taille de l'image pixelisée réelle
         int pixelW = w / tileSize;
         int pixelH = h / tileSize;
+        
+        std::cout << pixelH << std::endl;
+        std::cout << pixelW << std::endl;
 
         juce::Image pixelImage(juce::Image::RGB, pixelW, pixelH, false);
         juce::Image::BitmapData src(currentFrame, juce::Image::BitmapData::readOnly);
@@ -169,6 +173,20 @@ private:
             }
         }
 
+        
+        for (int x = 0; x < 320; x++)
+        {
+            for (int y = 0; y < 192; y++)
+            {
+                if (y < 180) {
+                    imgBufferForPrint[y][x] = imgBuffer[x][y];
+                } else {
+                    imgBufferForPrint[y][x] = 0;
+                }
+                
+            }
+        }
+        
         // Sauvegarde
         auto file = juce::File::getSpecialLocation(juce::File::userDesktopDirectory)
                         .getChildFile("photo_pixelArt.png");

@@ -46,6 +46,7 @@ public:
     void sendControlChange (int channel, int controllerNumber, int controllerValue);
     
     void sendByteAsMidi(uint8_t b);
+    void printPhoto();
     
 private:
 

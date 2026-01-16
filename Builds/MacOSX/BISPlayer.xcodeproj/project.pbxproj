@@ -40,6 +40,7 @@
 		E66C85C8531C1351EC6DF5C8 /* include_juce_gui_extra.mm */ = {isa = PBXBuildFile; fileRef = DBD3DD3F6CA803CE09919EE0; };
 		E7A99A612E666AABA836FC8A /* include_juce_graphics.mm */ = {isa = PBXBuildFile; fileRef = CAB040A544738422C42A73A8; };
 		E7C29E4D6A253EFA8B192235 /* include_juce_audio_processors_lv2_libs.cpp */ = {isa = PBXBuildFile; fileRef = DD53BAFAF65EDAE231F757C8; };
+		EB4C4C14049A483449990C4A /* CameraCapture.cpp */ = {isa = PBXBuildFile; fileRef = 846CD24C2B8077F620C08C3E; };
 		F40C169E5B3D32CA3FBCD768 /* Main.cpp */ = {isa = PBXBuildFile; fileRef = 876D96515625DC21AE98BA34; };
 		F817FA2D29DF6F81AF6446F3 /* include_juce_core_CompilationTime.cpp */ = {isa = PBXBuildFile; fileRef = 5D92CA33B9AD06633531E786; };
 		F9A7B0D26DD6E55E6F848F9E /* Accelerate.framework */ = {isa = PBXBuildFile; fileRef = 2B65DB77D84FDC568AB1907A; };
@@ -79,6 +80,7 @@
 		754456D57D6C4D7CFCCBB24A /* include_juce_core.mm */ /* include_juce_core.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; name = include_juce_core.mm; path = ../../JuceLibraryCode/include_juce_core.mm; sourceTree = SOURCE_ROOT; };
 		76B5B5247EB6875547A35341 /* include_juce_events.mm */ /* include_juce_events.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; name = include_juce_events.mm; path = ../../JuceLibraryCode/include_juce_events.mm; sourceTree = SOURCE_ROOT; };
 		792B6F0BFF2ED76B3649EB29 /* juce_core */ /* juce_core */ = {isa = PBXFileReference; lastKnownFileType = folder; name = juce_core; path = ../../JUCE/modules/juce_core; sourceTree = SOURCE_ROOT; };
+		846CD24C2B8077F620C08C3E /* CameraCapture.cpp */ /* CameraCapture.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = CameraCapture.cpp; path = ../../Source/CameraCapture.cpp; sourceTree = SOURCE_ROOT; };
 		87145C6AC371D197C4930F99 /* CoreMedia.framework */ /* CoreMedia.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreMedia.framework; path = System/Library/Frameworks/CoreMedia.framework; sourceTree = SDKROOT; };
 		876D96515625DC21AE98BA34 /* Main.cpp */ /* Main.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = Main.cpp; path = ../../Source/Main.cpp; sourceTree = SOURCE_ROOT; };
 		8A31DDFED004C5E259FD7308 /* CoreMIDI.framework */ /* CoreMIDI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreMIDI.framework; path = System/Library/Frameworks/CoreMIDI.framework; sourceTree = SDKROOT; };
@@ -138,6 +140,7 @@
 			isa = PBXGroup;
 			children = (
 				0A0AE323B201802F2C1CC4BD,
+				846CD24C2B8077F620C08C3E,
 				F8F864AC86EB8BAA56BEB16B,
 				876D96515625DC21AE98BA34,
 				BD4D1D58D64A8416BB1E4F1B,
@@ -339,6 +342,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				EB4C4C14049A483449990C4A,
 				F40C169E5B3D32CA3FBCD768,
 				C1146A202B18AD6EDE16B83E,
 				601A1E8B477D49B70AD2566F,

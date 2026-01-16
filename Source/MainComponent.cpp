@@ -68,32 +68,6 @@ MainComponent::MainComponent()
     // Activer le focus clavier pour recevoir les événements de touches
     setWantsKeyboardFocus (true);
     
-
-    
-    // Configurer le callback pour détecter la fin de la vidéo
-    // Utiliser MessageManager::callAsync pour s'assurer que l'appel est thread-safe
-    /*videoComponent.onPlaybackStopped = [this]()
-    {
-        juce::MessageManager::callAsync ([this]()
-        {
-            // Vérifier si la vidéo est arrivée à la fin
-            if (videoComponent.isVideoOpen())
-            {
-                auto duration = videoComponent.getVideoDuration();
-                auto position = videoComponent.getPlayPosition();
-                
-                // Si on est proche de la fin (à moins de 0.1 seconde), passer à la suivante
-                if (duration > 0 && position >= duration - 0.1)
-                {
-                    juce::MessageManager::callAsync ([this]()
-                    {
-                        playNextVideo();
-                    }
-                }
-            }
-        });
-    };*/
-    
     scanPrograms();
     
     // Démarrer le timer pour vérifier périodiquement la fin de la vidéo
@@ -256,6 +230,44 @@ void MainComponent::resized()
     }
 }
 
+void MainComponent::printPhoto() {
+    auto buff = capture->imgBufferForPrint;
+    const int maxLen = 320;
+    
+    for (int yy = 0; yy < 14; yy++) {
+        
+        sendControlChange(15, 60, 60);
+        juce::Thread::sleep (4);
+        
+        int yBase = yy * 24;
+        
+        for (int x = 0; x < 192; x++)
+        {
+            for (int byte = 0; byte < 3; byte++)
+            {
+                uint8_t v = 0;
+
+                for (int bit = 0; bit < 8; bit++)
+                {
+                    int bb = (byte * 8 + bit);
+                    int y = yBase + bb;
+
+                    if (y < maxLen && buff[x][y]) {
+                        v |= (1 << (7 - bit));
+                    }
+                }
+
+                sendByteAsMidi(v);
+            }
+        }
+        
+        juce::Thread::sleep (4);
+        sendControlChange(15, 60, 60);
+        juce::Thread::sleep (2000);
+    }
+    
+}
+
 bool MainComponent::keyPressed (const juce::KeyPress& key)
 {
     // Toggle la visibilité du logger avec la touche K (insensible à la casse)
@@ -272,86 +284,6 @@ bool MainComponent::keyPressed (const juce::KeyPress& key)
         resized();  // Recalculer le layout
         return true;  // Consommer l'événement
     }
-    if (key.getTextCharacter() == 'd' || key.getTextCharacter() == 'D')
-    {
-        /*
-        int k = 1;
-        while(k--) {
-            juce::Thread::sleep (20);
-            
-            sendControlChange(15, 60, 60);
-            int len = 192;
-            bool state = true;
-            
-            uint8 chan = 15;
-            
-            juce::Thread::sleep (20);
-            
-            int timing = 2;
-            
-            for (int i = 0; i < len; i++) {
-                
-                if (state) {
-                    sendByteAsMidi(0xff);
-                    juce::Thread::sleep (timing);
-                    sendByteAsMidi(0xff);
-                    juce::Thread::sleep (timing);
-                    sendByteAsMidi(0xff);
-                    juce::Thread::sleep (timing);
-                } else {
-                    sendByteAsMidi(0x00);
-                    juce::Thread::sleep (timing);
-                    sendByteAsMidi(0x00);
-                    juce::Thread::sleep (timing);
-                    sendByteAsMidi(0x00);
-                    juce::Thread::sleep (timing);
-                }
-                state = !state;
-                //juce::Thread::sleep (20);
-                
-            }
-            juce::Thread::sleep (20);
-            sendControlChange(15, 60, 60);
-        }*/
-        
-        auto buff = capture->imgBufferForPrint;
-        const int maxLen = 320;
-        
-        
-        for (int yy = 0; yy < 14; yy++) {
-            
-            sendControlChange(15, 60, 60);
-            juce::Thread::sleep (4);
-            
-            int yBase = yy * 24;
-            
-            for (int x = 0; x < 192; x++)
-            {
-                for (int byte = 0; byte < 3; byte++)
-                {
-                    uint8_t v = 0;
-
-                    for (int bit = 0; bit < 8; bit++)
-                    {
-                        int bb = (byte * 8 + bit);
-                        int y = yBase + bb;
-
-                        if (y < maxLen && buff[x][y]) {
-                            v |= (1 << (7 - bit));
-                        }
-                    }
-
-                    sendByteAsMidi(v);
-                }
-            }
-            
-            juce::Thread::sleep (4);
-            sendControlChange(15, 60, 60);
-            juce::Thread::sleep (2000);
-        }
-        
-    }
-    
     return false;  // Laisser passer les autres touches
 }
 

@@ -45,6 +45,8 @@ public:
     void sendProgramChange (int channel, int programNumber);
     void sendControlChange (int channel, int controllerNumber, int controllerValue);
     
+    void sendByteAsMidi(uint8_t b);
+    
 private:
 
     void loadProgram(Program* pgm);

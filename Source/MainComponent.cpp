@@ -274,7 +274,8 @@ bool MainComponent::keyPressed (const juce::KeyPress& key)
     }
     if (key.getTextCharacter() == 'd' || key.getTextCharacter() == 'D')
     {
-        int k = 3;
+        /*
+        int k = 1;
         while(k--) {
             juce::Thread::sleep (20);
             
@@ -286,22 +287,24 @@ bool MainComponent::keyPressed (const juce::KeyPress& key)
             
             juce::Thread::sleep (20);
             
+            int timing = 2;
+            
             for (int i = 0; i < len; i++) {
                 
                 if (state) {
-                    sendNoteOn(chan, (uint8)127, (uint8)127, false);
-                    juce::Thread::sleep (1);
-                    sendNoteOn(chan, (uint8)127, (uint8)127, false);
-                    juce::Thread::sleep (1);
-                    sendNoteOn(chan, (uint8)127, (uint8)127, false);
-                    juce::Thread::sleep (1);
+                    sendByteAsMidi(0xff);
+                    juce::Thread::sleep (timing);
+                    sendByteAsMidi(0xff);
+                    juce::Thread::sleep (timing);
+                    sendByteAsMidi(0xff);
+                    juce::Thread::sleep (timing);
                 } else {
-                    sendNoteOn(chan, (uint8)1, (uint8)1, false);
-                    juce::Thread::sleep (1);
-                    sendNoteOn(chan, (uint8)1, (uint8)1, false);
-                    juce::Thread::sleep (1);
-                    sendNoteOn(chan, (uint8)1, (uint8)1, false);
-                    juce::Thread::sleep (1);
+                    sendByteAsMidi(0x00);
+                    juce::Thread::sleep (timing);
+                    sendByteAsMidi(0x00);
+                    juce::Thread::sleep (timing);
+                    sendByteAsMidi(0x00);
+                    juce::Thread::sleep (timing);
                 }
                 state = !state;
                 //juce::Thread::sleep (20);
@@ -309,12 +312,59 @@ bool MainComponent::keyPressed (const juce::KeyPress& key)
             }
             juce::Thread::sleep (20);
             sendControlChange(15, 60, 60);
+        }*/
+        
+        auto buff = capture->imgBuffer;
+        
+        for (int yy = 0; yy < 4; yy++) {
+            
+            juce::Thread::sleep (20);
+            sendControlChange(15, 60, 60);
+            juce::Thread::sleep (20);
+            
+            int yBase = yy * 24;
+            
+            for (int x = 0; x < 192; x++)
+            {
+                for (int byte = 0; byte < 3; byte++)
+                {
+                    uint8_t v = 0;
+
+                    for (int bit = 0; bit < 8; bit++)
+                    {
+                        int bb = (byte * 8 + bit);
+                        int y = yBase + bb;
+
+                        if (y < 108 && buff[x][y]) {
+                            v |= (1 << (7 - bit));
+                        }
+                    }
+
+                    sendByteAsMidi(v);
+                }
+            }
+            
+            juce::Thread::sleep (20);
+            sendControlChange(15, 60, 60);
+            juce::Thread::sleep (2000);
         }
         
     }
     
     return false;  // Laisser passer les autres touches
 }
+
+
+
+void MainComponent::sendByteAsMidi(uint8_t b)
+{
+    uint8_t note = b & 0x7F;
+    uint8_t vel  = (b & 0x80) ? 1 : 2;
+
+    sendNoteOn(15, note, vel, false);
+    juce::Thread::sleep (1);
+}
+
 
 void MainComponent::loadVideoFile (const juce::URL& videoURL)
 {

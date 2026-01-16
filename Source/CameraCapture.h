@@ -26,6 +26,8 @@ public:
 
         setSize(640, 480);
     }
+    
+    bool imgBuffer[192][108];
 
     ~CameraCapture() override
     {
@@ -60,7 +62,7 @@ public:
         {
             for (int bx = 0; bx < image.getWidth(); bx += tileSize)
             {
-                juce::Colour tileColour = processBlockToColour(src, bx, by, image.getWidth(), image.getHeight());
+                juce::Colour tileColour = processBlockToColour(src, bx, by, image.getWidth(), image.getHeight()) ? juce::Colours::black : juce::Colours::white;
 
                 // Remplissage du bloc
                 for (int y = by; y < by + tileSize && y < image.getHeight(); ++y)
@@ -104,8 +106,8 @@ private:
     int threshold = 127;
 
     // Calcule la couleur (noir ou blanc) pour un bloc donné dans une image
-    juce::Colour processBlockToColour(const juce::Image::BitmapData& src, 
-                                      int blockX, int blockY, 
+    bool processBlockToColour(const juce::Image::BitmapData& src,
+                                      int blockX, int blockY,
                                       int imageWidth, int imageHeight)
     {
         int sumGrey = 0;
@@ -127,8 +129,10 @@ private:
 
         // Seuil pour noir/blanc
         uint8 avgGrey = static_cast<uint8>(sumGrey / count);
-        return (avgGrey < threshold) ? juce::Colours::black : juce::Colours::white;
+        return (avgGrey < threshold);
     }
+    
+    
 
     void takePhoto()
     {
@@ -157,8 +161,11 @@ private:
             {
                 int blockX = bx * tileSize;
                 int blockY = by * tileSize;
-                juce::Colour tileColour = processBlockToColour(src, blockX, blockY, w, h);
+                bool pixRes = processBlockToColour(src, blockX, blockY, w, h);
+                juce::Colour tileColour = pixRes ? juce::Colours::black : juce::Colours::white;
                 dst.setPixelColour(bx, by, tileColour);
+  
+                imgBuffer[bx][by] = pixRes;
             }
         }
 
@@ -173,5 +180,7 @@ private:
         png.writeImageToStream(pixelImage, stream);
         DBG("Photo saved to: " << file.getFullPathName());
     }
+
+    
 
 };

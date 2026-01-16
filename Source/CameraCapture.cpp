@@ -173,12 +173,12 @@ void CameraCapture::timerCallback()
     else if (countdownValue == 0)
     {
         repaint(); // Enlever l'affichage du décompte
-        mmRef->sendNoteOn(10, MIN_LED + 3, 127);
+        //mmRef->sendNoteOn(10, MIN_LED + 3, 127);
         
         
     } else {
         // Le décompte est terminé, prendre la photo
-        mmRef->sendNoteOn(10, MIN_LED, 0);
+        //mmRef->sendNoteOn(10, MIN_LED, 0);
         stopTimer();
         isCountingDown = false;
         takePhotoButton.setEnabled(true);
@@ -254,6 +254,8 @@ void CameraCapture::takePhoto()
 
 void CameraCapture::printPhoto() {
     
+    mmRef->sendProgramChange(16, 1);
+    
     auto buff = imgBufferForPrint;
     const int maxLen = 320;
     
@@ -294,4 +296,13 @@ void CameraCapture::printPhoto() {
     
     mmRef->sendControlChange(15, 50, 50);
     
+    // Notifier que l'impression est terminée
+    if (onPrintFinished)
+    {
+        juce::MessageManager::callAsync([this]()
+        {
+            if (onPrintFinished)
+                onPrintFinished();
+        });
+    }
 }

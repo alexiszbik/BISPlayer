@@ -59,6 +59,12 @@ MainComponent::MainComponent()
     
     capture = std::make_unique<CameraCapture>(midiManager.get());
     
+    // Configurer le callback pour être notifié quand l'impression est terminée
+    capture->onPrintFinished = [this]()
+    {
+        midiManager->sendProgramChange(16, 71);
+    };
+    
     addAndMakeVisible (videoComponent);
     addAndMakeVisible (logTextEditor);
     addAndMakeVisible (thresholdSlider);
@@ -296,6 +302,7 @@ void MainComponent::loadVideoFile (const juce::URL& videoURL)
 void MainComponent::stopAndHideVideo() {
     videoComponent.setVisible(false);
     videoComponent.stop();
+    midiManager->sendProgramChange(16, 71);
     capture->setVisible(true);
 }
 

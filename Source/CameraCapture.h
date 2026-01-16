@@ -2,6 +2,7 @@
 
 #include <JuceHeader.h>
 #include <stdlib.h>
+#include <functional>
 #include "MidiManager.h"
 
 class CameraCapture : public juce::Component,
@@ -20,6 +21,9 @@ public:
     void timerCallback() override;
 
     void startCountdown();
+    
+    // Callback appelé quand l'impression est terminée
+    std::function<void()> onPrintFinished;
     
 private:
     static constexpr int tileSize = 6; // taille de la tuile pour le pixel art

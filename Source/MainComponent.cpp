@@ -84,7 +84,7 @@ MainComponent::MainComponent()
     scanPrograms();
     
     // Démarrer le timer pour vérifier périodiquement la fin de la vidéo
-    startTimer (50);  // Vérifier toutes les 1000ms
+    startTimer (50);  // Vérifier toutes les 50ms
     
     setAudioChannels (0, 2);
     
@@ -104,6 +104,10 @@ MainComponent::MainComponent()
     // Make sure you set the size of the component after
     // you add any child components.
     setSize (1200, 600);
+    
+    auto docsDir = juce::File::getSpecialLocation (juce::File::userDocumentsDirectory);
+    auto bisDir = docsDir.getChildFile ("BIS");
+    idleVideoFile = bisDir.getChildFile ("0106.mov");
     
     idle();
     
@@ -132,7 +136,27 @@ MainComponent::~MainComponent()
 }
 
 void MainComponent::idle() {
+    capture->setVisible(false);
+    videoComponent.setVisible(true);
     midiManager->sendProgramChange(16, 71);
+    
+    // Charger et jouer la vidéo idle
+    
+    
+    if (idleVideoFile.existsAsFile())
+    {
+        capture->setVisible(false);
+        videoComponent.setVisible(true);
+        if (videoComponent.getCurrentVideoFile() != idleVideoFile) {
+            loadVideoFile (juce::URL (idleVideoFile));
+        } else {
+            videoComponent.setPlayPosition(0);
+        }
+    }
+    else
+    {
+        juce::Logger::writeToLog ("Idle video not found: " + idleVideoFile.getFullPathName());
+    }
 }
 
 void MainComponent::loadProgram(Program* pgm) {
@@ -251,9 +275,6 @@ bool MainComponent::keyPressed (const juce::KeyPress& key)
     if (key.getTextCharacter() == 'k' || key.getTextCharacter() == 'K')
     {
 
-    
-    
-        
         isLoggerVisible = !isLoggerVisible;
         logTextEditor.setVisible (isLoggerVisible);
         thresholdSlider.setVisible (isLoggerVisible);
@@ -271,6 +292,7 @@ bool MainComponent::keyPressed (const juce::KeyPress& key)
 
 void MainComponent::loadVideoFile (const juce::URL& videoURL)
 {
+    videoIsloading = true;
     std::cout << (const char*)videoURL.toString(false).toUTF8() << std::endl;
     // Charger la vidéo de manière asynchrone (fonctionne sur toutes les plateformes)
     videoComponent.loadAsync (videoURL,
@@ -279,7 +301,9 @@ void MainComponent::loadVideoFile (const juce::URL& videoURL)
         if (result.wasOk())
         {
             videoComponent.setAudioVolume (1.0f);
+            videoComponent.setPlayPosition(0);
             videoComponent.play();
+            videoIsloading = false;
         }
         else
         {
@@ -328,36 +352,45 @@ void MainComponent::handleIncomingMidiMessage (juce::MidiInput* source, const ju
                      ", Velocity: " + juce::String (velocity);
         
         juce::Logger::writeToLog (logMessage);
-        /*
-        currentVideoIndex++;
-        currentVideoIndex = currentVideoIndex % videoUrls.size();
         
-        loadVideoFile (videoUrls[currentVideoIndex]);*/
+        // Vérifier si au moins 1 seconde s'est écoulée depuis le dernier Note On
+        double currentTime = juce::Time::getMillisecondCounterHiRes();
+        double timeSinceLastNoteOn = currentTime - lastNoteOnTime;
         
-        MessageManager::callAsync([noteNumber, this]()
+        if (timeSinceLastNoteOn >= NOTE_ON_THROTTLE_MS)
         {
-            if (noteNumber >= FIRST_NOTE && noteNumber < (programs.size() + FIRST_NOTE)) {
-                
-                loadProgram(&programs[noteNumber - FIRST_NOTE]);
-            } else {
-                
-            }
+            // Mettre à jour le timestamp du dernier Note On traité
+            lastNoteOnTime = currentTime;
             
-            switch (noteNumber) {
-                case 50: {
-                    stopAndHideVideo();
-                }
-                    break;
-                case 51: {
-                    stopAndHideVideo();
-                    capture->startCountdown();
-                }
-                    break;
+            MessageManager::callAsync([noteNumber, this]()
+            {
+                if (noteNumber >= FIRST_NOTE && noteNumber < (programs.size() + FIRST_NOTE)) {
+                    loadProgram(&programs[noteNumber - FIRST_NOTE]);
+                } else {
                     
-                default:
-                    break;
-            }
-        });
+                }
+                
+                switch (noteNumber) {
+                    case 50: {
+                        stopAndHideVideo();
+                    }
+                        break;
+                    case 51: {
+                        stopAndHideVideo();
+                        capture->startCountdown();
+                    }
+                        break;
+                        
+                    default:
+                        break;
+                }
+            });
+        }
+        else
+        {
+            // Note On ignoré car trop proche du précédent
+            juce::Logger::writeToLog ("Note On throttled (ignored) - " + juce::String (timeSinceLastNoteOn) + "ms since last");
+        }
         
     }
     else if (message.isNoteOff())
@@ -370,6 +403,7 @@ void MainComponent::handleIncomingMidiMessage (juce::MidiInput* source, const ju
                      ", Note: " + juce::String (noteNumber) + 
                      ", Velocity: " + juce::String (velocity);
         
+        
         juce::Logger::writeToLog (logMessage);
     }
     else if (message.isProgramChange())
@@ -379,6 +413,7 @@ void MainComponent::handleIncomingMidiMessage (juce::MidiInput* source, const ju
         
         logMessage = "MIDI IN [" + sourceName + "] Program Change - Channel: " + juce::String (channel) + 
                      ", Program: " + juce::String (programNumber);
+    
         
         juce::Logger::writeToLog (logMessage);
     }
@@ -388,11 +423,16 @@ void MainComponent::handleIncomingMidiMessage (juce::MidiInput* source, const ju
         const int controllerValue = message.getControllerValue();
         const int channel = message.getChannel();
         
-        logMessage = "MIDI IN [" + sourceName + "] Control Change - Channel: " + juce::String (channel) + 
+        if (channel == 4 && controllerNumber == 10) {
+            sendNoteOn(10, MIN_LED+3, controllerValue > 90 ? 127 : 0, false);
+        }
+        /*
+        logMessage = "MIDI IN [" + sourceName + "] Control Change - Channel: " + juce::String (channel) +
                      ", CC: " + juce::String (controllerNumber) + 
                      ", Value: " + juce::String (controllerValue);
         
         juce::Logger::writeToLog (logMessage);
+         */
     }
 }
 
@@ -470,15 +510,21 @@ void MainComponent::sendControlChange (int channel, int controllerNumber, int co
 
 void MainComponent::timerCallback()
 {
+    if (capture->isVisible()) {
+        return;
+    }
+    
     // Vérifier périodiquement si la vidéo est arrivée à la fin
     if (videoComponent.isVideoOpen())
     {
         if (!videoComponent.isPlaying()) {
             
+            std::cout << "end of video" << std::endl;
+            
             juce::MessageManager::callAsync ([this]()
             {
-                //playNextVideo();
-                //std::cout << "end of video" << std::endl;
+                idle();
+                
             });
         }
     }

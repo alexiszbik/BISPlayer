@@ -42,7 +42,7 @@ public:
 private:
     //==============================================================================
     juce::TextEditor* logTextEditor;
-    static constexpr int maxLogLines = 1000;
+    static constexpr int maxLogLines = 200;
     
     void trimLogIfNeeded()
     {

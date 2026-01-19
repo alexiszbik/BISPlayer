@@ -65,6 +65,8 @@ private:
     
     void stopAndHideVideo();
     void idle();
+    
+    void setCaptureMode(bool state);
 
 private:
     //==============================================================================
@@ -97,6 +99,15 @@ private:
     int currentVideoIndex = 0;
     
     std::vector<Program> programs;
+    
+    File idleVideoFile;
+    
+    bool videoIsloading = false;
+    bool captureMode = false;
+    
+    // Timestamp du dernier Note On traité (pour limiter à 1 par seconde)
+    double lastNoteOnTime = 0.0;
+    static constexpr double NOTE_ON_THROTTLE_MS = 1000.0;  // 1 seconde
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MainComponent)
 };

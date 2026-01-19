@@ -8,10 +8,6 @@ CameraCapture::CameraCapture(MidiManager* midiManager) : mmRef(midiManager)
         juce::Logger::writeToLog (d);
     }
     // Ouvrir la première caméra
-    camera.reset(juce::CameraDevice::openDevice(0));
-    
-    if (camera)
-        camera->addListener(this);
     
     // Bouton pour prendre une photo
     addAndMakeVisible(takePhotoButton);
@@ -34,6 +30,14 @@ CameraCapture::~CameraCapture()
 void CameraCapture::resized()
 {
     takePhotoButton.setBounds(10, 10, 120, 30);
+    
+    if (!camera) {
+        camera.reset(juce::CameraDevice::openDevice(0));
+        
+        if (camera)
+            camera->addListener(this);
+    }
+
 }
 
 void CameraCapture::setThreshold(float value)

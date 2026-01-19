@@ -234,7 +234,7 @@ void CameraCapture::takePhoto()
         for (int y = 0; y < 192; y++)
         {
             if (y < 180) {
-                imgBufferForPrint[y][x] = imgBuffer[x][y];
+                imgBufferForPrint[y][x] = imgBuffer[x][179-y];
             } else {
                 imgBufferForPrint[y][x] = 0;
             }

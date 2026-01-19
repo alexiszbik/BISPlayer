@@ -84,7 +84,7 @@ MainComponent::MainComponent()
     scanPrograms();
     
     // Démarrer le timer pour vérifier périodiquement la fin de la vidéo
-    startTimer (50);  // Vérifier toutes les 50ms
+    startTimer (1000);  // Vérifier toutes les 1000ms
     
     setAudioChannels (0, 2);
     
@@ -168,7 +168,7 @@ void MainComponent::loadProgram(Program* pgm) {
     loadVideoFile(videoUrl);
     
     sendProgramChange(16, pgm->getMatrixProgram());
-    sendNoteOn(15, pgm->getPrinterNote(), 60);
+    sendProgramChange(15, pgm->getPrinterNote());
 }
 
 //==============================================================================

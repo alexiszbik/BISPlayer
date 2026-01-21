@@ -84,7 +84,7 @@ MainComponent::MainComponent()
     scanPrograms();
     
     // Démarrer le timer pour vérifier périodiquement la fin de la vidéo
-    startTimer (1000);  // Vérifier toutes les 1000ms
+    startTimer (600);  // Vérifier toutes les 1000ms
     
     setAudioChannels (0, 2);
     

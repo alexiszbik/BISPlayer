@@ -43,7 +43,7 @@ public:
     void sendProgramChange (int channel, int programNumber);
     void sendControlChange (int channel, int controllerNumber, int controllerValue);
     
-    
+    void updateLoggerVisibility();
 private:
 
     void loadProgram(Program* pgm);
@@ -94,7 +94,7 @@ private:
     std::unique_ptr<MidiManager> midiManager;
     
     // État de visibilité du logger
-    bool isLoggerVisible = true;
+    bool isLoggerVisible = false;
     
     int currentVideoIndex = 0;
     

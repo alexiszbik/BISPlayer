@@ -269,20 +269,24 @@ void MainComponent::resized()
     }
 }
 
+void MainComponent::updateLoggerVisibility() {
+    
+    logTextEditor.setVisible (isLoggerVisible);
+    thresholdSlider.setVisible (isLoggerVisible);
+    thresholdLabel.setVisible (isLoggerVisible);
+    midiInputComboBox.setVisible (isLoggerVisible);
+    midiOutputComboBox.setVisible (isLoggerVisible);
+    midiInputLabel.setVisible (isLoggerVisible);
+    midiOutputLabel.setVisible (isLoggerVisible);
+}
+
 bool MainComponent::keyPressed (const juce::KeyPress& key)
 {
     // Toggle la visibilité du logger avec la touche K (insensible à la casse)
     if (key.getTextCharacter() == 'k' || key.getTextCharacter() == 'K')
     {
-
         isLoggerVisible = !isLoggerVisible;
-        logTextEditor.setVisible (isLoggerVisible);
-        thresholdSlider.setVisible (isLoggerVisible);
-        thresholdLabel.setVisible (isLoggerVisible);
-        midiInputComboBox.setVisible (isLoggerVisible);
-        midiOutputComboBox.setVisible (isLoggerVisible);
-        midiInputLabel.setVisible (isLoggerVisible);
-        midiOutputLabel.setVisible (isLoggerVisible);
+        updateLoggerVisibility();
         resized();  // Recalculer le layout
         return true;  // Consommer l'événement
     }

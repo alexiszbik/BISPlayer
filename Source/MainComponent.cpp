@@ -497,10 +497,6 @@ void MainComponent::timerCallback()
         return;
     }
     
-    if (capture->isVisible()) {
-        return;
-    }
-    
     if (ledStateChanged) {
         sendNoteOn(10, MIN_LED+3, ledState, false);
         ledStateChanged = false;
@@ -538,6 +534,10 @@ void MainComponent::timerCallback()
         //});
         
     } else {
+        if (capture->isVisible()) {
+            return;
+        }
+        
         if (videoComponent.isVideoOpen())
         {
             if (!videoComponent.isPlaying()) {

@@ -371,6 +371,10 @@ void MainComponent::handleIncomingMidiMessage (juce::MidiInput* source, const ju
                 }
                 
                 switch (noteNumber) {
+                    case 49: {
+                        idle();
+                    }
+                        break;
                     case 50: {
                         stopAndHideVideo();
                     }

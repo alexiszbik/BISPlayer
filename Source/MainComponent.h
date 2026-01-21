@@ -108,6 +108,11 @@ private:
     // Timestamp du dernier Note On traité (pour limiter à 1 par seconde)
     double lastNoteOnTime = 0.0;
     static constexpr double NOTE_ON_THROTTLE_MS = 1000.0;  // 1 seconde
+    
+    bool ledState = false;
+    bool ledStateChanged = false;
+    
+    int newProgram = -1;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MainComponent)
 };

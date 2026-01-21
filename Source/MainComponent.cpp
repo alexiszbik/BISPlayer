@@ -362,33 +362,8 @@ void MainComponent::handleIncomingMidiMessage (juce::MidiInput* source, const ju
             // Mettre à jour le timestamp du dernier Note On traité
             lastNoteOnTime = currentTime;
             
-            MessageManager::callAsync([noteNumber, this]()
-            {
-                if (noteNumber >= FIRST_NOTE && noteNumber < (programs.size() + FIRST_NOTE)) {
-                    loadProgram(&programs[noteNumber - FIRST_NOTE]);
-                } else {
-                    
-                }
-                
-                switch (noteNumber) {
-                    case 49: {
-                        idle();
-                    }
-                        break;
-                    case 50: {
-                        stopAndHideVideo();
-                    }
-                        break;
-                    case 51: {
-                        stopAndHideVideo();
-                        capture->startCountdown();
-                    }
-                        break;
-                        
-                    default:
-                        break;
-                }
-            });
+            newProgram = noteNumber;
+            
         }
         else
         {
@@ -428,7 +403,11 @@ void MainComponent::handleIncomingMidiMessage (juce::MidiInput* source, const ju
         const int channel = message.getChannel();
         
         if (channel == 4 && controllerNumber == 10) {
-            sendNoteOn(10, MIN_LED+3, controllerValue > 90 ? 127 : 0, false);
+            bool newLedState = controllerValue > 80 ? 127 : 0;
+            if (newLedState != ledState) {
+                ledState = newLedState;
+                ledStateChanged = true;
+            }
         }
         /*
         logMessage = "MIDI IN [" + sourceName + "] Control Change - Channel: " + juce::String (channel) +
@@ -522,18 +501,56 @@ void MainComponent::timerCallback()
         return;
     }
     
-    // Vérifier périodiquement si la vidéo est arrivée à la fin
-    if (videoComponent.isVideoOpen())
-    {
-        if (!videoComponent.isPlaying()) {
-            
-            std::cout << "end of video" << std::endl;
-            
-            juce::MessageManager::callAsync ([this]()
-            {
-                idle();
+    if (ledStateChanged) {
+        sendNoteOn(10, MIN_LED+3, ledState, false);
+        ledStateChanged = false;
+    }
+    
+    if (newProgram >= 0) {
+        
+        /*MessageManager::callAsync([this]()
+        {*/
+            if (newProgram >= FIRST_NOTE && newProgram < (programs.size() + FIRST_NOTE)) {
+                loadProgram(&programs[newProgram - FIRST_NOTE]);
+            } else {
                 
-            });
+            }
+            
+            switch (newProgram) {
+                case 49: {
+                    idle();
+                }
+                    break;
+                case 50: {
+                    stopAndHideVideo();
+                }
+                    break;
+                case 51: {
+                    stopAndHideVideo();
+                    capture->startCountdown();
+                }
+                    break;
+                default:
+                    break;
+            }
+            
+            newProgram = -1;
+        //});
+        
+    } else {
+        if (videoComponent.isVideoOpen())
+        {
+            if (!videoComponent.isPlaying()) {
+                
+                std::cout << "end of video" << std::endl;
+                
+                /*juce::MessageManager::callAsync ([this]()
+                {
+                 */
+                    idle();
+                //});
+            }
         }
     }
+    
 }

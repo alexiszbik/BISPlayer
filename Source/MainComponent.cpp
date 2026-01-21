@@ -514,6 +514,10 @@ void MainComponent::sendControlChange (int channel, int controllerNumber, int co
 
 void MainComponent::timerCallback()
 {
+    if (videoIsloading) {
+        return;
+    }
+    
     if (capture->isVisible()) {
         return;
     }
